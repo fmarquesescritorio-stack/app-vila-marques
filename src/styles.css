@@ -17,6 +17,13 @@ html, body {
   overflow-x: hidden;
 }
 
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+}
+
 body {
   margin: 0;
   font-family: "Avenir Next", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
@@ -71,6 +78,12 @@ body {
   display: flex;
   gap: 8px;
   margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.auth-tabs .tab-btn {
+  flex: 1 1 140px;
+  text-align: center;
 }
 
 .auth-hidden {
@@ -119,9 +132,11 @@ body {
 
 .topbar-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   position: relative;
+  min-width: 0;
 }
 
 .role-badge {
@@ -259,6 +274,7 @@ body {
   line-height: 1.4;
   flex: 1;
   overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .modules-dropdown {
@@ -1196,26 +1212,51 @@ body.balance-values-blurred #balanceModule .month-profit {
 
 @media (max-width: 840px) {
   body { font-size: 15px; }
-  .layout { padding: 12px; }
-  .panel { padding: 14px; }
+  .auth-gate { padding: 12px; }
+  .auth-card { padding: 14px; border-radius: 12px; }
+  .layout { padding: 10px; }
+  .panel { padding: 12px; border-radius: 12px; }
   .form-grid { grid-template-columns: 1fr; }
   .inline-form,
   .inline-form-3 { grid-template-columns: 1fr; }
-  .topbar { flex-direction: column; align-items: flex-start; }
-  .topbar .btn-primary { width: 100%; }
-  .topbar-actions { width: 100%; flex-direction: column; }
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px 10px;
+    gap: 10px;
+  }
+  .topbar-brand { width: 100%; }
+  .topbar-logo { width: min(260px, 100%); }
+  .topbar .btn-primary { width: 100%; min-width: 0; white-space: normal; }
+  .topbar-actions { width: 100%; flex-direction: column; align-items: stretch; }
+  .topbar-actions .btn { width: 100%; min-width: 0; }
+  .role-badge { align-self: flex-start; }
   .notifications-wrap { width: 100%; }
   .notifications-btn { width: 100%; }
-  .notifications-panel { left: 0; right: auto; width: 100%; }
+  .notifications-panel { left: 0; right: auto; width: calc(100vw - 20px); max-width: calc(100vw - 20px); }
   .announcement-bar { padding: 10px 12px; }
-  .announcement-inner { align-items: flex-start; }
+  .announcement-inner {
+    align-items: flex-start;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 10px;
+    row-gap: 6px;
+  }
+  .modules-dropdown { grid-column: 1 / 2; }
+  .announcement-content { grid-column: 2 / 3; }
   .announcement-content { font-size: 12px; }
-  .modules-menu { left: 0; right: auto; min-width: 220px; }
+  .modules-menu {
+    left: 0;
+    right: auto;
+    min-width: 0;
+    width: min(280px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+  }
   .step-actions { flex-direction: column; }
   .step-actions .btn { width: 100%; }
   .row-end { justify-content: stretch; }
   .row-end .btn { width: 100%; }
-  .footer { padding: 0 12px 14px; }
+  .footer { padding: 0 10px 12px; }
   .footer .btn { width: 100%; }
   .footer { flex-direction: column; }
   .list li { align-items: flex-start; gap: 8px; flex-direction: column; }

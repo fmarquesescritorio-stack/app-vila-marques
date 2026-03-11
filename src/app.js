@@ -1476,7 +1476,7 @@ function toggleSupabaseConfig(forceShow) {
   const form = document.getElementById("authConfigForm");
   if (!form) return;
   if (!canEditAuthConfig()) {
-    setAuthMessage("Configuração do Supabase está bloqueada para segurança.");
+    setAuthMessage("Configuração de acesso bloqueada para segurança.");
     return;
   }
   const shouldShow = typeof forceShow === "boolean"
@@ -1524,7 +1524,7 @@ async function initAuthClient() {
 
   if (!config.url || !config.anonKey) {
     const setupMsg = canEditAuthConfig()
-      ? "Sem Supabase configurado. Configure Supabase para continuar."
+      ? "Acesso não configurado. Configure o acesso para continuar."
       : "Configuração de autenticação bloqueada.";
     setAuthMessage(setupMsg, true);
     showAppShell(false);
@@ -1532,7 +1532,7 @@ async function initAuthClient() {
   }
 
   if (!window.supabase || !window.supabase.createClient) {
-    setAuthMessage("Biblioteca Supabase não carregada.", true);
+    setAuthMessage("Biblioteca de autenticação não carregada.", true);
     showAppShell(false);
     return;
   }
@@ -5455,7 +5455,7 @@ function bindEvents() {
   document.getElementById("authConfigForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!canEditAuthConfig()) {
-      setAuthMessage("Configuração do Supabase bloqueada.", true);
+      setAuthMessage("Configuração de acesso bloqueada.", true);
       return;
     }
     const url = String(document.getElementById("supabaseUrlInput").value || "").trim();
@@ -5481,7 +5481,7 @@ function bindEvents() {
       return;
     }
     if (!authState.client) {
-      setAuthMessage("Configuração do Supabase necessária para login.", true);
+      setAuthMessage("Configuração de acesso necessária para login.", true);
       return;
     }
     const { error } = await authState.client.auth.signInWithPassword({
@@ -5502,7 +5502,7 @@ function bindEvents() {
       return;
     }
     if (!authState.client) {
-      setAuthMessage("Configure o Supabase antes do cadastro.", true);
+      setAuthMessage("Configure o acesso antes do cadastro.", true);
       return;
     }
     const data = formToObject(event.currentTarget);
@@ -5521,7 +5521,7 @@ function bindEvents() {
   document.getElementById("forgotForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!authState.client) {
-      setAuthMessage("Configure o Supabase antes de recuperar senha.", true);
+      setAuthMessage("Configure o acesso antes de recuperar senha.", true);
       return;
     }
     const data = formToObject(event.currentTarget);
@@ -5538,7 +5538,7 @@ function bindEvents() {
   document.getElementById("resetForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!authState.client) {
-      setAuthMessage("Configure o Supabase antes de redefinir senha.", true);
+      setAuthMessage("Configure o acesso antes de redefinir senha.", true);
       return;
     }
     const data = formToObject(event.currentTarget);
