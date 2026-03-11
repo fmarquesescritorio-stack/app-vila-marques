@@ -76,6 +76,7 @@
             <button id="tabEmployees" class="tab-btn" type="button" data-tab="employees">Funcionários</button>
             <button id="tabPayslip" class="tab-btn" type="button" data-tab="payslip">Contracheque</button>
             <button id="tabBalance" class="tab-btn" type="button" data-tab="balance">Balanço</button>
+            <button id="tabTaxes" class="tab-btn" type="button" data-tab="taxes">Impostos</button>
             <button id="tabContracts" class="tab-btn" type="button" data-tab="contracts">Contratos</button>
             <button id="tabRentedProperties" class="tab-btn" type="button" data-tab="rentedProperties">Imóveis Alugados</button>
             <button id="tabExports" class="tab-btn" type="button" data-tab="exports">Exportados</button>
@@ -494,6 +495,7 @@
                     <option value="aluguel">Aluguel</option>
                     <option value="salario">Salário</option>
                     <option value="manutencao">Manutenção</option>
+                    <option value="impostos">Impostos</option>
                     <option value="agua">Água</option>
                     <option value="luz">Luz</option>
                     <option value="internet">Internet</option>
@@ -620,6 +622,35 @@
           <div id="cloudSyncStatus" class="small"></div>
 
           <div id="exportsList"></div>
+        </section>
+      </section>
+
+      <section id="taxesModule" class="module">
+        <section class="panel">
+          <h2>Impostos</h2>
+          <p class="small">Informe mensalmente o faturamento bruto e o valor pago em impostos para cálculo automático da alíquota.</p>
+          <form id="taxesForm" class="form-grid">
+            <label>Mês de referência
+              <input name="referenceMonth" type="month" required />
+            </label>
+            <label>Data de pagamento (opcional)
+              <input name="paymentDateISO" type="date" />
+            </label>
+            <label>Faturamento bruto mensal (R$)
+              <input name="grossRevenue" data-brl inputmode="numeric" value="R$ 0,00" required />
+            </label>
+            <label>Impostos pagos no mês (R$)
+              <input name="taxPaid" data-brl inputmode="numeric" value="R$ 0,00" required />
+            </label>
+            <label class="full">Observações
+              <input name="notes" placeholder="Ex.: DAS + ISS do mês" />
+            </label>
+            <div id="taxesRatePreview" class="full small"></div>
+            <div class="full row-end">
+              <button id="btnSaveTaxRecord" class="btn btn-primary" type="submit">Salvar imposto mensal</button>
+            </div>
+          </form>
+          <div id="taxesList" class="balance-monthly"></div>
         </section>
       </section>
 

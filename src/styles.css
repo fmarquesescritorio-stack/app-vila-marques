@@ -1386,6 +1386,7 @@ body.balance-values-blurred #balanceModule .month-profit {
   #clientsModule .panel,
   #employeesModule .panel,
   #contractsModule .panel,
+  #taxesModule .panel,
   #rentedPropertiesModule .panel,
   #exportsModule .panel,
   #balanceModule .panel {
@@ -1394,6 +1395,7 @@ body.balance-values-blurred #balanceModule .month-profit {
   #clientsModule .balance-table,
   #employeesModule .balance-table,
   #contractsModule .balance-table,
+  #taxesModule .balance-table,
   #rentedPropertiesModule .balance-table,
   #exportsModule .balance-table,
   #balanceModule .balance-table {
@@ -1408,6 +1410,8 @@ body.balance-values-blurred #balanceModule .month-profit {
   #employeesModule .balance-table td,
   #contractsModule .balance-table th,
   #contractsModule .balance-table td,
+  #taxesModule .balance-table th,
+  #taxesModule .balance-table td,
   #rentedPropertiesModule .balance-table th,
   #rentedPropertiesModule .balance-table td,
   #exportsModule .balance-table th,
@@ -1422,6 +1426,7 @@ body.balance-values-blurred #balanceModule .month-profit {
   #employeesModule .exports-actions .btn,
   #clientsModule .exports-actions .btn,
   #contractsModule .exports-actions .btn,
+  #taxesModule .exports-actions .btn,
   #rentedPropertiesModule .exports-actions .btn,
   #exportsModule .exports-actions .btn,
   #balanceModule .exports-actions .btn {

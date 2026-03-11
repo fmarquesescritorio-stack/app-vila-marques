@@ -100,6 +100,9 @@ const state = {
   balance: {
     entries: [],
   },
+  taxes: {
+    records: [],
+  },
   contracts: createEmptyContract(),
   contractsPortfolio: [],
   activeContractId: "",
@@ -131,6 +134,7 @@ const uiState = {
   balanceYear: new Date().getFullYear(),
   balanceMonth: new Date().getMonth() + 1,
   balanceContractId: "",
+  editingTaxRecordId: "",
 };
 
 const authState = {
@@ -228,6 +232,7 @@ const EXPENSE_CATEGORY_LABELS = {
   aluguel: "Aluguel",
   salario: "Salário",
   manutencao: "Manutenção",
+  impostos: "Impostos",
   agua: "Água",
   luz: "Luz",
   internet: "Internet",
@@ -784,6 +789,11 @@ function applyStateSnapshot(data) {
     ...(data.balance || {}),
     entries: (data.balance && data.balance.entries) || [],
   };
+  state.taxes = {
+    ...state.taxes,
+    ...(data.taxes || {}),
+    records: (data.taxes && data.taxes.records) || [],
+  };
   state.contracts = {
     ...state.contracts,
     ...(data.contracts || {}),
@@ -808,6 +818,7 @@ function getStateSnapshot() {
     payslip: cloneSnapshot(state.payslip || {}),
     payslipEmployees: cloneSnapshot(state.payslipEmployees || []),
     balance: cloneSnapshot(state.balance || {}),
+    taxes: cloneSnapshot(state.taxes || {}),
     contracts: cloneSnapshot(state.contracts || {}),
     contractsPortfolio: cloneSnapshot(state.contractsPortfolio || []),
     activeContractId: String(state.activeContractId || "").trim(),
@@ -968,9 +979,35 @@ function normalizeStatePatterns() {
     contractId: String(entry.contractId || "").trim(),
     category: String(entry.category || "").trim().toLowerCase(),
     employeeId: String(entry.employeeId || "").trim(),
+    linkedTaxRecordId: String(entry.linkedTaxRecordId || "").trim(),
     linkedContractPaymentId: String(entry.linkedContractPaymentId || "").trim(),
     linkedRentedPropertyPaymentId: String(entry.linkedRentedPropertyPaymentId || "").trim(),
   })).filter((entry) => entry.description && entry.amount >= 0 && entry.dateTime);
+
+  state.taxes.records = (state.taxes.records || [])
+    .map((record) => ({
+      id: String(record.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`),
+      referenceMonth: formatYearMonthISO(
+        parseYearMonthISO(record.referenceMonth)?.year || new Date().getFullYear(),
+        parseYearMonthISO(record.referenceMonth)?.month || (new Date().getMonth() + 1),
+      ),
+      grossRevenue: Number(record.grossRevenue || 0),
+      taxPaid: Number(record.taxPaid || 0),
+      paymentDateISO: String(record.paymentDateISO || "").trim(),
+      notes: String(record.notes || "").trim(),
+      updatedAt: String(record.updatedAt || "").trim(),
+    }))
+    .filter((record) => record.referenceMonth)
+    .sort((a, b) => String(b.referenceMonth).localeCompare(String(a.referenceMonth)));
+  const taxIds = new Set((state.taxes.records || []).map((record) => String(record.id)));
+  state.balance.entries = (state.balance.entries || []).filter((entry) => {
+    const linkedId = String(entry.linkedTaxRecordId || "");
+    if (!linkedId) return true;
+    return taxIds.has(linkedId);
+  });
+  (state.taxes.records || []).forEach((record) => {
+    upsertTaxBalanceEntry(record);
+  });
 
   state.furniture = (state.furniture || []).map((item) => ({
     item: canonicalFurnitureItemName(item.item),
@@ -1340,6 +1377,7 @@ function canAccessTab(tabName) {
     employees: "accessEmployees",
     payslip: "accessPayslip",
     balance: "accessBalance",
+    taxes: "accessBalance",
     contracts: "accessContracts",
     rentedProperties: "accessContracts",
     exports: "accessExports",
@@ -1391,6 +1429,7 @@ function applyPermissionsUi() {
     ["tabEmployees", "accessEmployees"],
     ["tabPayslip", "accessPayslip"],
     ["tabBalance", "accessBalance"],
+    ["tabTaxes", "accessBalance"],
     ["tabContracts", "accessContracts"],
     ["tabRentedProperties", "accessContracts"],
     ["tabExports", "accessExports"],
@@ -1709,6 +1748,11 @@ function resetActiveTabInputs() {
     return;
   }
 
+  if (uiState.activeTab === "taxes") {
+    uiState.editingTaxRecordId = "";
+    return;
+  }
+
   if (uiState.activeTab === "contracts") {
     resetContractsDraftForm(false);
     uiState.contractsFormOpen = false;
@@ -1773,12 +1817,17 @@ function resetModuleUiState(moduleName) {
   if (moduleName === "balance") {
     uiState.balanceMode = "monthly";
     uiState.balanceContractId = "";
+    return;
+  }
+
+  if (moduleName === "taxes") {
+    uiState.editingTaxRecordId = "";
   }
 }
 
 function setActiveTab(tabName) {
   const previousTab = uiState.activeTab;
-  let nextTab = ["proposals", "clients", "employees", "payslip", "balance", "contracts", "rentedProperties", "exports"].includes(tabName)
+  let nextTab = ["proposals", "clients", "employees", "payslip", "balance", "taxes", "contracts", "rentedProperties", "exports"].includes(tabName)
     ? tabName
     : "proposals";
   if (!canAccessTab(nextTab)) {
@@ -1795,6 +1844,7 @@ function setActiveTab(tabName) {
   const employeesModule = document.getElementById("employeesModule");
   const payslipModule = document.getElementById("payslipModule");
   const balanceModule = document.getElementById("balanceModule");
+  const taxesModule = document.getElementById("taxesModule");
   const contractsModule = document.getElementById("contractsModule");
   const rentedPropertiesModule = document.getElementById("rentedPropertiesModule");
   const exportsModule = document.getElementById("exportsModule");
@@ -1803,6 +1853,7 @@ function setActiveTab(tabName) {
   const tabEmployees = document.getElementById("tabEmployees");
   const tabPayslip = document.getElementById("tabPayslip");
   const tabBalance = document.getElementById("tabBalance");
+  const tabTaxes = document.getElementById("tabTaxes");
   const tabContracts = document.getElementById("tabContracts");
   const tabRentedProperties = document.getElementById("tabRentedProperties");
   const tabExports = document.getElementById("tabExports");
@@ -1814,6 +1865,7 @@ function setActiveTab(tabName) {
   employeesModule.classList.toggle("module-active", uiState.activeTab === "employees");
   payslipModule.classList.toggle("module-active", uiState.activeTab === "payslip");
   balanceModule.classList.toggle("module-active", uiState.activeTab === "balance");
+  taxesModule.classList.toggle("module-active", uiState.activeTab === "taxes");
   contractsModule.classList.toggle("module-active", uiState.activeTab === "contracts");
   rentedPropertiesModule.classList.toggle("module-active", uiState.activeTab === "rentedProperties");
   exportsModule.classList.toggle("module-active", uiState.activeTab === "exports");
@@ -1822,6 +1874,7 @@ function setActiveTab(tabName) {
   tabEmployees.classList.toggle("tab-btn-active", uiState.activeTab === "employees");
   tabPayslip.classList.toggle("tab-btn-active", uiState.activeTab === "payslip");
   tabBalance.classList.toggle("tab-btn-active", uiState.activeTab === "balance");
+  tabTaxes.classList.toggle("tab-btn-active", uiState.activeTab === "taxes");
   tabContracts.classList.toggle("tab-btn-active", uiState.activeTab === "contracts");
   tabRentedProperties.classList.toggle("tab-btn-active", uiState.activeTab === "rentedProperties");
   tabExports.classList.toggle("tab-btn-active", uiState.activeTab === "exports");
@@ -2664,6 +2717,58 @@ function monthNameByNumber(monthNumber) {
   return new Date(2000, monthNumber - 1, 1).toLocaleDateString("pt-BR", { month: "long" });
 }
 
+function formatYearMonthLabel(referenceMonth) {
+  const parsed = parseYearMonthISO(referenceMonth);
+  if (!parsed) return "-";
+  return `${String(parsed.month).padStart(2, "0")}/${parsed.year}`;
+}
+
+function taxRatePercent(grossRevenue, taxPaid) {
+  const gross = Number(grossRevenue || 0);
+  const paid = Number(taxPaid || 0);
+  if (gross <= 0 || paid <= 0) return 0;
+  return (paid / gross) * 100;
+}
+
+function getTaxBalanceEntryDateISO(record) {
+  const paymentDate = parseISODateOnly(String(record?.paymentDateISO || "").trim());
+  if (paymentDate) return toISODateOnly(paymentDate);
+  const parsedMonth = parseYearMonthISO(record?.referenceMonth);
+  if (!parsedMonth) return toISODateOnly(new Date());
+  return toISODateOnly(dateWithClampedDay(parsedMonth.year, parsedMonth.month - 1, 15));
+}
+
+function upsertTaxBalanceEntry(record) {
+  if (!record || !record.id) return;
+  const amount = Number(record.taxPaid || 0);
+  const referenceLabel = formatYearMonthLabel(record.referenceMonth);
+  const linkedIdx = (state.balance.entries || []).findIndex(
+    (entry) => String(entry.linkedTaxRecordId || "") === String(record.id),
+  );
+  if (amount <= 0) {
+    if (linkedIdx >= 0) state.balance.entries.splice(linkedIdx, 1);
+    return;
+  }
+  const nextEntry = {
+    id: linkedIdx >= 0
+      ? String(state.balance.entries[linkedIdx].id || `${Date.now()}-${Math.random().toString(16).slice(2)}`)
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    type: "expense",
+    description: `Impostos do mês ${referenceLabel}`,
+    amount,
+    dateTime: `${getTaxBalanceEntryDateISO(record)}T12:00`,
+    responsible: "Fiscal",
+    contractId: "",
+    category: "impostos",
+    employeeId: "",
+    linkedTaxRecordId: String(record.id),
+    linkedContractPaymentId: "",
+    linkedRentedPropertyPaymentId: "",
+  };
+  if (linkedIdx >= 0) state.balance.entries[linkedIdx] = nextEntry;
+  else state.balance.entries.push(nextEntry);
+}
+
 function formatDateTimeBR(value) {
   const dt = new Date(value);
   if (Number.isNaN(dt.getTime())) return value;
@@ -2686,6 +2791,7 @@ function resolveExpenseCategory(entry) {
   if (text.includes("aluguel")) return "aluguel";
   if (text.includes("salário") || text.includes("salario")) return "salario";
   if (text.includes("manutenção") || text.includes("manutencao")) return "manutencao";
+  if (text.includes("imposto") || text.includes("tributo")) return "impostos";
   if (text.includes("água") || text.includes("agua")) return "agua";
   if (text.includes("luz")) return "luz";
   if (text.includes("internet")) return "internet";
@@ -2716,6 +2822,9 @@ function buildExpenseDescription(data) {
   if (category === "manutencao") {
     const maintenanceDetails = String(data.maintenanceDetails || "").trim();
     return maintenanceDetails ? `Manutenção - ${maintenanceDetails}` : "Manutenção";
+  }
+  if (category === "impostos") {
+    return details ? `Impostos - ${details}` : "Impostos";
   }
   if (category === "agua") {
     const contractName = getContractDisplayName(data.contractId);
@@ -3139,6 +3248,22 @@ function buildBalanceMonthlyForecast(year, monthNumber) {
         contractId: "",
       });
     });
+
+  (state.taxes.records || []).forEach((record) => {
+    const parsed = parseYearMonthISO(record.referenceMonth);
+    if (!parsed) return;
+    if (parsed.year !== y || parsed.month !== month) return;
+    const amount = Number(record.taxPaid || 0);
+    if (amount <= 0) return;
+    expectedExpenses.push({
+      source: "Módulo de Impostos",
+      type: "Real informado",
+      description: `Impostos do mês ${formatYearMonthLabel(record.referenceMonth)}`,
+      amount,
+      dateISO: getTaxBalanceEntryDateISO(record),
+      contractId: "",
+    });
+  });
   const estimatedExpensesTotal = expectedExpenses
     .reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const totalExpectedExpenses = estimatedExpensesTotal;
@@ -3437,6 +3562,9 @@ function renderBalance() {
   const totalTollExpense = scopedEntries
     .filter((entry) => isTollExpense(entry))
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  const totalTaxExpense = scopedEntries
+    .filter((entry) => resolveExpenseCategory(entry) === "impostos")
+    .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
   const totalProfit = totalIncome - totalExpense;
 
   const summaryTitle =
@@ -3557,6 +3685,7 @@ function renderBalance() {
       <div class="balance-summary-card"><div class="label">Despesas Totais</div><div class="value balance-expense">${currencyBRL.format(totalExpense)}</div></div>
       <div class="balance-summary-card"><div class="label">Combustível</div><div class="value balance-expense">${currencyBRL.format(totalFuelExpense)}</div></div>
       <div class="balance-summary-card"><div class="label">Pedágios</div><div class="value balance-expense">${currencyBRL.format(totalTollExpense)}</div></div>
+      <div class="balance-summary-card"><div class="label">Impostos</div><div class="value balance-expense">${currencyBRL.format(totalTaxExpense)}</div></div>
       <div class="balance-summary-card"><div class="label">Lucro</div><div class="value">${currencyBRL.format(totalProfit)}</div></div>
     </div>
   `;
@@ -4211,6 +4340,90 @@ function renderClientSelects() {
       rentedPropertyContractSelect.value = String(editingProperty?.contractId || "");
     }
   }
+}
+
+function renderTaxes() {
+  const taxesList = document.getElementById("taxesList");
+  const taxesRate = document.getElementById("taxesRatePreview");
+  const taxesForm = document.getElementById("taxesForm");
+  if (!taxesList || !taxesRate || !taxesForm) return;
+
+  const currentData = formToObject(taxesForm);
+  const grossRevenue = parseBRLNumber(currentData.grossRevenue || 0);
+  const taxPaid = parseBRLNumber(currentData.taxPaid || 0);
+  const rate = taxRatePercent(grossRevenue, taxPaid);
+  taxesRate.innerHTML = `
+    <strong>Alíquota automática do mês:</strong>
+    ${rate.toFixed(2).replace(".", ",")}% (${currencyBRL.format(taxPaid)} sobre ${currencyBRL.format(grossRevenue)})
+  `;
+
+  const records = [...(state.taxes.records || [])].sort((a, b) =>
+    String(b.referenceMonth || "").localeCompare(String(a.referenceMonth || "")),
+  );
+  if (!records.length) {
+    taxesList.innerHTML = '<div class="small">Nenhum imposto mensal cadastrado.</div>';
+    return;
+  }
+
+  const rows = records.map((record) => {
+    const recordRate = taxRatePercent(record.grossRevenue, record.taxPaid);
+    return `
+      <tr>
+        <td>${escapeHtml(formatYearMonthLabel(record.referenceMonth))}</td>
+        <td>${currencyBRL.format(Number(record.grossRevenue || 0))}</td>
+        <td>${currencyBRL.format(Number(record.taxPaid || 0))}</td>
+        <td>${recordRate.toFixed(2).replace(".", ",")}%</td>
+        <td>${formatDateBR(record.paymentDateISO)}</td>
+        <td>${escapeHtml(record.notes || "-")}</td>
+        <td>
+          <div class="exports-actions">
+            <button type="button" class="btn" data-action="edit-tax" data-tax-id="${escapeHtml(record.id)}">Editar</button>
+            <button type="button" class="btn btn-danger" data-action="delete-tax" data-tax-id="${escapeHtml(record.id)}">Apagar</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  taxesList.innerHTML = `
+    <table class="balance-table">
+      <thead>
+        <tr>
+          <th>Mês</th>
+          <th>Faturamento bruto</th>
+          <th>Imposto pago</th>
+          <th>Alíquota</th>
+          <th>Data do pagamento</th>
+          <th>Observações</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function setTaxesFormValues(record) {
+  const form = document.getElementById("taxesForm");
+  if (!form) return;
+  form.elements.namedItem("referenceMonth").value = String(record?.referenceMonth || "");
+  form.elements.namedItem("paymentDateISO").value = String(record?.paymentDateISO || "");
+  form.elements.namedItem("grossRevenue").value = formatBRLInputValue(record?.grossRevenue || 0);
+  form.elements.namedItem("taxPaid").value = formatBRLInputValue(record?.taxPaid || 0);
+  form.elements.namedItem("notes").value = String(record?.notes || "");
+  setupBRLInputs(form);
+}
+
+function clearTaxesForm() {
+  const form = document.getElementById("taxesForm");
+  if (!form) return;
+  form.reset();
+  const monthInput = form.elements.namedItem("referenceMonth");
+  if (monthInput && !monthInput.value) monthInput.value = formatYearMonthISO(new Date().getFullYear(), new Date().getMonth() + 1);
+  form.elements.namedItem("grossRevenue").value = "R$ 0,00";
+  form.elements.namedItem("taxPaid").value = "R$ 0,00";
+  setupBRLInputs(form);
+  uiState.editingTaxRecordId = "";
 }
 
 function useClientInProposal(clientId) {
@@ -5374,6 +5587,7 @@ function renderAll() {
   renderClientCatalog();
   renderEmployeeCatalog();
   renderBalance();
+  renderTaxes();
   renderContracts();
   renderRentedPropertiesModule();
   renderExports();
@@ -5691,6 +5905,11 @@ function bindEvents() {
     setActiveTab("balance");
   });
 
+  document.getElementById("tabTaxes").addEventListener("click", () => {
+    setActiveTab("taxes");
+    renderTaxes();
+  });
+
   document.getElementById("tabContracts").addEventListener("click", () => {
     setActiveTab("contracts");
     renderContracts();
@@ -5729,6 +5948,92 @@ function bindEvents() {
   document.getElementById("balanceContractSelect").addEventListener("change", (event) => {
     uiState.balanceContractId = String(event.currentTarget.value || "");
     renderBalance();
+  });
+
+  const taxesForm = document.getElementById("taxesForm");
+  if (taxesForm) {
+    setupBRLInputs(taxesForm);
+    if (!taxesForm.elements.namedItem("referenceMonth").value) {
+      taxesForm.elements.namedItem("referenceMonth").value = formatYearMonthISO(new Date().getFullYear(), new Date().getMonth() + 1);
+    }
+    taxesForm.addEventListener("input", () => {
+      renderTaxes();
+    });
+    taxesForm.addEventListener("change", () => {
+      renderTaxes();
+    });
+    taxesForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = formToObject(event.currentTarget);
+      const parsedMonth = parseYearMonthISO(data.referenceMonth);
+      if (!parsedMonth) {
+        alert("Informe um mês de referência válido.");
+        return;
+      }
+      const referenceMonth = formatYearMonthISO(parsedMonth.year, parsedMonth.month);
+      const grossRevenue = parseBRLNumber(data.grossRevenue || 0);
+      const taxPaid = parseBRLNumber(data.taxPaid || 0);
+      const paymentDateISO = String(data.paymentDateISO || "").trim();
+      const notes = String(data.notes || "").trim();
+
+      const duplicate = (state.taxes.records || []).find(
+        (record) => record.referenceMonth === referenceMonth && record.id !== uiState.editingTaxRecordId,
+      );
+      if (duplicate) {
+        alert("Já existe lançamento de impostos para este mês. Edite o registro existente.");
+        return;
+      }
+
+      const record = {
+        id: uiState.editingTaxRecordId || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        referenceMonth,
+        grossRevenue,
+        taxPaid,
+        paymentDateISO,
+        notes,
+        updatedAt: new Date().toISOString(),
+      };
+      const idx = (state.taxes.records || []).findIndex((item) => item.id === record.id);
+      if (idx >= 0) state.taxes.records[idx] = record;
+      else state.taxes.records.push(record);
+      upsertTaxBalanceEntry(record);
+      state.taxes.records = (state.taxes.records || []).sort((a, b) =>
+        String(b.referenceMonth || "").localeCompare(String(a.referenceMonth || "")),
+      );
+      uiState.editingTaxRecordId = "";
+      clearTaxesForm();
+      saveState();
+      renderAll();
+    });
+  }
+
+  document.getElementById("taxesList")?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const button = target.closest("button[data-action]");
+    if (!button) return;
+    const action = String(button.getAttribute("data-action") || "");
+    const taxId = String(button.getAttribute("data-tax-id") || "");
+    if (!taxId) return;
+    const record = (state.taxes.records || []).find((item) => item.id === taxId);
+    if (!record) return;
+
+    if (action === "edit-tax") {
+      uiState.editingTaxRecordId = record.id;
+      setTaxesFormValues(record);
+      renderTaxes();
+      return;
+    }
+    if (action === "delete-tax") {
+      if (!confirm("Deseja apagar este lançamento de impostos?")) return;
+      state.taxes.records = (state.taxes.records || []).filter((item) => item.id !== taxId);
+      state.balance.entries = (state.balance.entries || []).filter(
+        (entry) => String(entry.linkedTaxRecordId || "") !== taxId,
+      );
+      if (uiState.editingTaxRecordId === taxId) clearTaxesForm();
+      saveState();
+      renderAll();
+    }
   });
 
   document.getElementById("btnPrevStep").addEventListener("click", () => {
@@ -7243,6 +7548,8 @@ function bindEvents() {
     } else if (uiState.activeTab === "balance") {
       ["incomeForm", "expenseForm"].forEach((id) => document.getElementById(id)?.reset());
       ["incomeForm", "expenseForm"].forEach((id) => setupBRLInputs(document.getElementById(id)));
+    } else if (uiState.activeTab === "taxes") {
+      clearTaxesForm();
     } else if (uiState.activeTab === "contracts") {
       document.getElementById("contractsForm")?.reset();
     } else if (uiState.activeTab === "rentedProperties") {
