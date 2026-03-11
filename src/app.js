@@ -1403,8 +1403,14 @@ function applyPermissionsUi() {
 
   const btnExportProposal = document.getElementById("btnExportPdf");
   const btnExportPayslip = document.getElementById("btnExportPayslipPdf");
-  if (btnExportProposal) btnExportProposal.style.display = hasPermission("exportProposal") ? "" : "none";
-  if (btnExportPayslip) btnExportPayslip.style.display = hasPermission("exportPayslip") ? "" : "none";
+  if (btnExportProposal) {
+    const canShowProposalExport = hasPermission("exportProposal") && uiState.activeTab === "proposals";
+    btnExportProposal.style.display = canShowProposalExport ? "" : "none";
+  }
+  if (btnExportPayslip) {
+    const canShowPayslipExport = hasPermission("exportPayslip") && uiState.activeTab === "payslip";
+    btnExportPayslip.style.display = canShowPayslipExport ? "" : "none";
+  }
 
   const btnNewClient = document.getElementById("btnNewClient");
   const btnNewEmployee = document.getElementById("btnNewEmployee");
