@@ -107,6 +107,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow-x: clip;
 }
 
 .topbar {
@@ -363,6 +364,7 @@ h1, h2 { margin: 0 0 8px; }
   display: block;
   padding: 20px;
   flex: 1 1 auto;
+  overflow-x: hidden;
 }
 
 .module {
@@ -1381,9 +1383,50 @@ body.balance-values-blurred #balanceModule .month-profit {
   .balance-filters { flex-direction: column; }
   .balance-filters label { min-width: 100%; }
   .balance-summary-grid { grid-template-columns: 1fr; }
-  .balance-table { display: block; overflow-x: auto; white-space: normal; }
-  .balance-table th,
-  .balance-table td { white-space: normal; word-break: break-word; }
+  #clientsModule .panel,
+  #employeesModule .panel,
+  #contractsModule .panel,
+  #rentedPropertiesModule .panel,
+  #exportsModule .panel,
+  #balanceModule .panel {
+    overflow-x: auto;
+  }
+  #clientsModule .balance-table,
+  #employeesModule .balance-table,
+  #contractsModule .balance-table,
+  #rentedPropertiesModule .balance-table,
+  #exportsModule .balance-table,
+  #balanceModule .balance-table {
+    width: max-content;
+    min-width: 100%;
+    table-layout: auto;
+    white-space: nowrap;
+  }
+  #clientsModule .balance-table th,
+  #clientsModule .balance-table td,
+  #employeesModule .balance-table th,
+  #employeesModule .balance-table td,
+  #contractsModule .balance-table th,
+  #contractsModule .balance-table td,
+  #rentedPropertiesModule .balance-table th,
+  #rentedPropertiesModule .balance-table td,
+  #exportsModule .balance-table th,
+  #exportsModule .balance-table td,
+  #balanceModule .balance-table th,
+  #balanceModule .balance-table td {
+    white-space: nowrap;
+    word-break: normal;
+    overflow-wrap: normal;
+    vertical-align: middle;
+  }
+  #employeesModule .exports-actions .btn,
+  #clientsModule .exports-actions .btn,
+  #contractsModule .exports-actions .btn,
+  #rentedPropertiesModule .exports-actions .btn,
+  #exportsModule .exports-actions .btn,
+  #balanceModule .exports-actions .btn {
+    white-space: nowrap;
+  }
 }
 
 @media print {
