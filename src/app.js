@@ -2395,9 +2395,7 @@ function calculatePayslipTotals() {
   const proportionalBaseSalary = baseDailyValue * workPeriod.workedCalendarDays;
   const absenceSalaryDiscountValue = baseDailyValue * unexcusedAbsenceDays;
   const salaryAfterAbsence = Math.max(0, proportionalBaseSalary - absenceSalaryDiscountValue);
-  const mealAllowanceFixed = selectedEmployee
-    ? Number(selectedEmployee.mealAllowanceFixed || 0)
-    : Number(state.payslip.mealAllowanceFixed || 0);
+  const mealAllowanceFixed = 0;
   const mealAllowanceDaily = selectedEmployee
     ? Number(selectedEmployee.mealAllowanceDaily || 0)
     : Number(state.payslip.mealAllowanceDaily || 0);
@@ -2407,13 +2405,13 @@ function calculatePayslipTotals() {
   const maximumMealAllowanceDays = businessDaysInMonth;
   const mealAllowancePaidDays = workedBusinessDays;
   const mealAllowanceDailyTotal = mealAllowanceDaily * mealAllowancePaidDays;
-  const mealAllowanceTotal = mealAllowanceFixed + mealAllowanceDailyTotal;
+  const mealAllowanceTotal = mealAllowanceDailyTotal;
   const mealAllowanceCardDiscountPercent = 20;
   const mealAllowanceCardDiscountValue = mealAllowanceTotal * (mealAllowanceCardDiscountPercent / 100);
   const customEarningsTotal = state.payslip.earnings.reduce((sum, item) => sum + Number(item.value || 0), 0);
   const customDiscountsTotal = state.payslip.discounts.reduce((sum, item) => sum + Number(item.value || 0), 0);
   const fixedDiscountValue = salaryAfterAbsence * (fixedDiscountPercent / 100);
-  const earningsTotal = proportionalBaseSalary + mealAllowanceFixed + mealAllowanceDailyTotal + customEarningsTotal;
+  const earningsTotal = proportionalBaseSalary + mealAllowanceDailyTotal + customEarningsTotal;
   const discountsTotal =
     customDiscountsTotal
     + fixedDiscountValue
@@ -2585,6 +2583,42 @@ function renderPayslip() {
       ${renderPayslipCopy("Funcionário")}
     </section>
   `;
+}
+
+function printHtmlContent({ title, bodyClass = "", contentHtml }) {
+  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1024,height=900");
+  if (!printWindow) {
+    alert("Não foi possível abrir a janela de impressão. Verifique o bloqueador de pop-up.");
+    return false;
+  }
+  const stylesHref = new URL("./styles.css", window.location.href).href;
+  const safeTitle = escapeHtml(title || "Documento");
+  const safeBodyClass = String(bodyClass || "").trim();
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${safeTitle}</title>
+    <link rel="stylesheet" href="${stylesHref}" />
+  </head>
+  <body class="${safeBodyClass}">
+    <main class="layout">${contentHtml}</main>
+  </body>
+</html>`);
+  printWindow.document.close();
+  const triggerPrint = () => {
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
+  };
+  if (printWindow.document.readyState === "complete") {
+    window.setTimeout(triggerPrint, 50);
+  } else {
+    printWindow.addEventListener("load", () => window.setTimeout(triggerPrint, 50), { once: true });
+  }
+  return true;
 }
 
 function toMonthKey(dateTimeStr) {
@@ -2856,7 +2890,7 @@ function calculateMonthlySalarySettlement({
   allowanceDays,
 }) {
   const baseSalary = Number(employee?.baseSalary || 0);
-  const mealAllowanceFixed = Number(employee?.mealAllowanceFixed || 0);
+  const mealAllowanceFixed = 0;
   const mealAllowanceDaily = Number(employee?.mealAllowanceDaily || 0);
   const fixedDiscountPercent = Number(employee?.fixedDiscountPercent || 0);
   const totalDays = Math.max(1, Number(monthTotalDays || getDaysInMonth(year, monthNumber)));
@@ -2879,7 +2913,7 @@ function calculateMonthlySalarySettlement({
   const absenceSalaryDiscountValue = baseDailyValue * unexcusedAbsenceDays;
   const salaryAfterAbsence = Math.max(0, proportionalBaseSalary - absenceSalaryDiscountValue);
   const mealAllowanceDailyTotal = mealAllowanceDaily * workedBusinessDays;
-  const mealAllowanceTotal = mealAllowanceFixed + mealAllowanceDailyTotal;
+  const mealAllowanceTotal = mealAllowanceDailyTotal;
   const mealAllowanceCardDiscountPercent = 20;
   const mealAllowanceCardDiscountValue = mealAllowanceTotal * (mealAllowanceCardDiscountPercent / 100);
   const fixedDiscountValue = salaryAfterAbsence * (fixedDiscountPercent / 100);
@@ -7112,8 +7146,17 @@ function bindEvents() {
     document.body.classList.remove("print-payslip");
     setActiveTab("proposals");
     setProposalStep(6);
-    registerExport("proposal");
-    window.print();
+    renderProposal();
+    const proposalDoc = document.querySelector("#proposalArea .proposal-doc");
+    if (!proposalDoc) {
+      alert("Não foi possível gerar a proposta para impressão.");
+      return;
+    }
+    const ok = printHtmlContent({
+      title: "Proposta Comercial",
+      contentHtml: `<section class="panel proposal">${proposalDoc.outerHTML}</section>`,
+    });
+    if (ok) registerExport("proposal");
   });
 
   document.getElementById("btnExportPayslipPdf").addEventListener("click", () => {
@@ -7125,12 +7168,22 @@ function bindEvents() {
     setActiveTab("payslip");
     document.body.classList.add("print-payslip");
     renderPayslip();
-    registerExport("payslip");
-    window.requestAnimationFrame(() => {
-      window.setTimeout(() => {
-        window.print();
-      }, 50);
+    const payslipOutput = document.getElementById("payslipOutput");
+    const payslipHtml = payslipOutput?.innerHTML || "";
+    if (!payslipHtml.trim()) {
+      alert("Não foi possível gerar o contracheque para impressão.");
+      document.body.classList.remove("print-payslip");
+      return;
+    }
+    const ok = printHtmlContent({
+      title: "Contracheque",
+      bodyClass: "print-payslip",
+      contentHtml: `<section id="payslipModule" class="module module-active"><section class="panel payslip-builder"><div class="payslip-output">${payslipHtml}</div></section></section>`,
     });
+    if (ok) registerExport("payslip");
+    window.setTimeout(() => {
+      document.body.classList.remove("print-payslip");
+    }, 150);
   });
 
   window.addEventListener("afterprint", () => {
