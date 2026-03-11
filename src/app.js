@@ -2586,16 +2586,28 @@ function renderPayslip() {
 }
 
 function printHtmlContent({ title, bodyClass = "", contentHtml }) {
-  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1024,height=900");
-  if (!printWindow) {
-    alert("Não foi possível abrir a janela de impressão. Verifique o bloqueador de pop-up.");
-    return false;
-  }
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
+  document.body.appendChild(iframe);
   const stylesHref = new URL("./styles.css", window.location.href).href;
   const safeTitle = escapeHtml(title || "Documento");
   const safeBodyClass = String(bodyClass || "").trim();
-  printWindow.document.open();
-  printWindow.document.write(`<!doctype html>
+  const printDocument = iframe.contentDocument;
+  if (!printDocument) {
+    iframe.remove();
+    alert("Não foi possível preparar a impressão.");
+    return false;
+  }
+  printDocument.open();
+  printDocument.write(`<!doctype html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
@@ -2607,16 +2619,28 @@ function printHtmlContent({ title, bodyClass = "", contentHtml }) {
     <main class="layout">${contentHtml}</main>
   </body>
 </html>`);
-  printWindow.document.close();
+  printDocument.close();
+  const printWindow = iframe.contentWindow;
+  if (!printWindow) {
+    iframe.remove();
+    alert("Não foi possível abrir a visualização de impressão.");
+    return false;
+  }
+  const cleanup = () => {
+    window.setTimeout(() => {
+      iframe.remove();
+    }, 300);
+  };
   const triggerPrint = () => {
     printWindow.focus();
     printWindow.print();
-    printWindow.close();
+    cleanup();
   };
-  if (printWindow.document.readyState === "complete") {
+  printWindow.onafterprint = cleanup;
+  if (printDocument.readyState === "complete") {
     window.setTimeout(triggerPrint, 50);
   } else {
-    printWindow.addEventListener("load", () => window.setTimeout(triggerPrint, 50), { once: true });
+    iframe.addEventListener("load", () => window.setTimeout(triggerPrint, 50), { once: true });
   }
   return true;
 }
