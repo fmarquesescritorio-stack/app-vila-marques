@@ -1305,15 +1305,19 @@ body.balance-values-blurred #balanceModule .month-profit {
   .notifications-panel { left: 0; right: auto; width: calc(100vw - 20px); max-width: calc(100vw - 20px); }
   .announcement-bar { padding: 8px 12px; }
   .announcement-inner {
+    display: flex;
     align-items: flex-start;
-    display: grid;
-    grid-template-columns: auto 1fr;
-    column-gap: 10px;
-    row-gap: 6px;
+    gap: 10px;
+    flex-wrap: nowrap;
   }
-  .modules-dropdown { grid-column: 1 / 2; }
+  .modules-dropdown {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+  }
   .announcement-content {
-    grid-column: 2 / 3;
+    flex: 1 1 auto;
+    min-width: 0;
     font-size: 12px;
     line-height: 1.35;
     word-break: break-word;
