@@ -81,6 +81,12 @@ body {
   display: none;
 }
 
+#appShell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -302,6 +308,7 @@ h1, h2 { margin: 0 0 8px; }
 .layout {
   display: block;
   padding: 20px;
+  flex: 1 1 auto;
 }
 
 .module {
@@ -548,7 +555,10 @@ input:focus, select:focus, textarea:focus {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding: 0 20px 20px;
+  margin-top: auto;
+  padding: 12px 20px 16px;
+  background: #fff;
+  border-top: 1px solid var(--border);
 }
 
 .proposal-box {
