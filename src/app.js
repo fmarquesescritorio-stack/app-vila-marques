@@ -1318,6 +1318,11 @@ function hasPermission(permissionKey) {
 function getUserDisplayNameFromEmail() {
   const email = String(authState.user?.email || "").trim().toLowerCase();
   if (!email) return "Usuário";
+  const friendlyNamesByEmail = {
+    "fmarquesescritorio@gmail.com": "Fred",
+    "lu.priscila@hotmail.com": "Luana",
+  };
+  if (friendlyNamesByEmail[email]) return friendlyNamesByEmail[email];
   const localPart = email.split("@")[0] || "Usuário";
   const tokens = localPart
     .replace(/[._-]+/g, " ")
