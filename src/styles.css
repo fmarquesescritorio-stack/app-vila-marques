@@ -11,6 +11,12 @@
 
 * { box-sizing: border-box; }
 
+html, body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   font-family: "Avenir Next", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
@@ -246,6 +252,7 @@ body {
   font-size: 13px;
   line-height: 1.4;
   flex: 1;
+  overflow-wrap: anywhere;
 }
 
 .modules-dropdown {
@@ -1211,7 +1218,9 @@ body.balance-values-blurred #balanceModule .month-profit {
   .checklist { grid-template-columns: 1fr; max-height: 250px; }
   .photo-actions { flex-direction: column; }
   .photo-actions .btn { width: 100%; }
-  .doc-table { display: block; overflow-x: auto; white-space: nowrap; }
+  .doc-table { display: block; overflow-x: auto; white-space: normal; }
+  .doc-table th,
+  .doc-table td { white-space: normal; word-break: break-word; }
   .doc-photos-grid { grid-template-columns: 1fr; }
   .contracts-summary-grid { grid-template-columns: 1fr; }
   .payslip-input-grid { grid-template-columns: 1fr; }
@@ -1225,7 +1234,9 @@ body.balance-values-blurred #balanceModule .month-profit {
   .balance-filters { flex-direction: column; }
   .balance-filters label { min-width: 100%; }
   .balance-summary-grid { grid-template-columns: 1fr; }
-  .balance-table { display: block; overflow-x: auto; white-space: nowrap; }
+  .balance-table { display: block; overflow-x: auto; white-space: normal; }
+  .balance-table th,
+  .balance-table td { white-space: normal; word-break: break-word; }
 }
 
 @media print {
