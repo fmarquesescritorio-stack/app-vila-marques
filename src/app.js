@@ -1453,17 +1453,17 @@ function switchAuthTab(tab) {
   const signupForm = document.getElementById("signupForm");
   const forgotForm = document.getElementById("forgotForm");
   const resetForm = document.getElementById("resetForm");
-  if (!tabLogin || !tabSignup || !tabForgot || !loginForm || !signupForm || !forgotForm || !resetForm) return;
+  if (!loginForm || !signupForm || !forgotForm || !resetForm) return;
 
-  tabSignup.style.display = ALLOW_PUBLIC_SIGNUP ? "" : "none";
+  if (tabSignup) tabSignup.style.display = ALLOW_PUBLIC_SIGNUP ? "" : "none";
   if (!ALLOW_PUBLIC_SIGNUP && tab === "signup") {
     tab = "login";
   }
 
   const active = tab === "reset" ? "forgot" : tab;
-  tabLogin.classList.toggle("tab-btn-active", active === "login");
-  tabSignup.classList.toggle("tab-btn-active", active === "signup");
-  tabForgot.classList.toggle("tab-btn-active", active === "forgot");
+  if (tabLogin) tabLogin.classList.toggle("tab-btn-active", active === "login");
+  if (tabSignup) tabSignup.classList.toggle("tab-btn-active", active === "signup");
+  if (tabForgot) tabForgot.classList.toggle("tab-btn-active", active === "forgot");
 
   loginForm.classList.toggle("auth-hidden", tab !== "login");
   signupForm.classList.toggle("auth-hidden", tab !== "signup");
@@ -5444,12 +5444,18 @@ function bindEvents() {
     });
   }
 
-  document.getElementById("authTabLogin").addEventListener("click", () => switchAuthTab("login"));
-  document.getElementById("authTabSignup").addEventListener("click", () => switchAuthTab("signup"));
-  document.getElementById("authTabForgot").addEventListener("click", () => switchAuthTab("forgot"));
-  document.getElementById("btnToggleSupabaseConfig").addEventListener("click", () => {
-    toggleSupabaseConfig();
-  });
+  const authTabLogin = document.getElementById("authTabLogin");
+  const authTabSignup = document.getElementById("authTabSignup");
+  const authTabForgot = document.getElementById("authTabForgot");
+  const btnToggleSupabaseConfig = document.getElementById("btnToggleSupabaseConfig");
+  if (authTabLogin) authTabLogin.addEventListener("click", () => switchAuthTab("login"));
+  if (authTabSignup) authTabSignup.addEventListener("click", () => switchAuthTab("signup"));
+  if (authTabForgot) authTabForgot.addEventListener("click", () => switchAuthTab("forgot"));
+  if (btnToggleSupabaseConfig) {
+    btnToggleSupabaseConfig.addEventListener("click", () => {
+      toggleSupabaseConfig();
+    });
+  }
   const btnUseTestAccess = document.getElementById("btnUseTestAccess");
   if (btnUseTestAccess) {
     btnUseTestAccess.addEventListener("click", () => {
@@ -5457,105 +5463,120 @@ function bindEvents() {
     });
   }
 
-  document.getElementById("authConfigForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!canEditAuthConfig()) {
-      setAuthMessage("Configuração de acesso bloqueada.", true);
-      return;
-    }
-    const url = String(document.getElementById("supabaseUrlInput").value || "").trim();
-    const anon = String(document.getElementById("supabaseAnonKeyInput").value || "").trim();
-    setLocalTestSession(false);
-    setSupabaseConfig(url, anon);
-    if (url && anon) setAuthConfigLocked(true);
-    setAuthMessage("Configuração salva. Inicializando autenticação...");
-    await initAuthClient();
-  });
-
-  document.getElementById("loginForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const data = formToObject(event.currentTarget);
-    if (ALLOW_LOCAL_TEST_LOGIN && isLocalTestCredential(data.email, data.password)) {
-      setLocalTestSession(true);
-      authState.mode = "local";
-      authState.user = { email: LOCAL_TEST_EMAIL };
-      await loadCurrentUserPermissions();
-      showAppShell(true);
-      setAuthMessage("Login de teste realizado.");
-      renderAll();
-      return;
-    }
-    if (!authState.client) {
-      setAuthMessage("Configuração de acesso necessária para login.", true);
-      return;
-    }
-    const { error } = await authState.client.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
+  const authConfigForm = document.getElementById("authConfigForm");
+  if (authConfigForm) {
+    authConfigForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!canEditAuthConfig()) {
+        setAuthMessage("Configuração de acesso bloqueada.", true);
+        return;
+      }
+      const url = String(document.getElementById("supabaseUrlInput").value || "").trim();
+      const anon = String(document.getElementById("supabaseAnonKeyInput").value || "").trim();
+      setLocalTestSession(false);
+      setSupabaseConfig(url, anon);
+      if (url && anon) setAuthConfigLocked(true);
+      setAuthMessage("Configuração salva. Inicializando autenticação...");
+      await initAuthClient();
     });
-    if (error) {
-      setAuthMessage(error.message, true);
-      return;
-    }
-    setAuthMessage("Login realizado com sucesso.");
-  });
+  }
 
-  document.getElementById("signupForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!ALLOW_PUBLIC_SIGNUP) {
-      setAuthMessage("Cadastro público desativado. Solicite criação ao administrador.", true);
-      return;
-    }
-    if (!authState.client) {
-      setAuthMessage("Configure o acesso antes do cadastro.", true);
-      return;
-    }
-    const data = formToObject(event.currentTarget);
-    const { error } = await authState.client.auth.signUp({
-      email: data.email,
-      password: data.password,
-      options: { emailRedirectTo: getRedirectUrl() },
+  const loginForm = document.getElementById("loginForm");
+  if (loginForm) {
+    loginForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const data = formToObject(event.currentTarget);
+      if (ALLOW_LOCAL_TEST_LOGIN && isLocalTestCredential(data.email, data.password)) {
+        setLocalTestSession(true);
+        authState.mode = "local";
+        authState.user = { email: LOCAL_TEST_EMAIL };
+        await loadCurrentUserPermissions();
+        showAppShell(true);
+        setAuthMessage("Login de teste realizado.");
+        renderAll();
+        return;
+      }
+      if (!authState.client) {
+        setAuthMessage("Configuração de acesso necessária para login.", true);
+        return;
+      }
+      const { error } = await authState.client.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+      if (error) {
+        setAuthMessage(error.message, true);
+        return;
+      }
+      setAuthMessage("Login realizado com sucesso.");
     });
-    if (error) {
-      setAuthMessage(error.message, true);
-      return;
-    }
-    setAuthMessage("Cadastro enviado. Verifique seu e-mail para confirmar a conta.");
-  });
+  }
 
-  document.getElementById("forgotForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!authState.client) {
-      setAuthMessage("Configure o acesso antes de recuperar senha.", true);
-      return;
-    }
-    const data = formToObject(event.currentTarget);
-    const { error } = await authState.client.auth.resetPasswordForEmail(data.email, {
-      redirectTo: getRedirectUrl(),
+  const signupForm = document.getElementById("signupForm");
+  if (signupForm) {
+    signupForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!ALLOW_PUBLIC_SIGNUP) {
+        setAuthMessage("Cadastro público desativado. Solicite criação ao administrador.", true);
+        return;
+      }
+      if (!authState.client) {
+        setAuthMessage("Configure o acesso antes do cadastro.", true);
+        return;
+      }
+      const data = formToObject(event.currentTarget);
+      const { error } = await authState.client.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: { emailRedirectTo: getRedirectUrl() },
+      });
+      if (error) {
+        setAuthMessage(error.message, true);
+        return;
+      }
+      setAuthMessage("Cadastro enviado. Verifique seu e-mail para confirmar a conta.");
     });
-    if (error) {
-      setAuthMessage(error.message, true);
-      return;
-    }
-    setAuthMessage("E-mail de recuperação enviado.");
-  });
+  }
 
-  document.getElementById("resetForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!authState.client) {
-      setAuthMessage("Configure o acesso antes de redefinir senha.", true);
-      return;
-    }
-    const data = formToObject(event.currentTarget);
-    const { error } = await authState.client.auth.updateUser({ password: data.password });
-    if (error) {
-      setAuthMessage(error.message, true);
-      return;
-    }
-    setAuthMessage("Senha atualizada. Faça login novamente.");
-    switchAuthTab("login");
-    if (window.location.hash) window.history.replaceState({}, document.title, getRedirectUrl());
-  });
+  const forgotForm = document.getElementById("forgotForm");
+  if (forgotForm) {
+    forgotForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!authState.client) {
+        setAuthMessage("Configure o acesso antes de recuperar senha.", true);
+        return;
+      }
+      const data = formToObject(event.currentTarget);
+      const { error } = await authState.client.auth.resetPasswordForEmail(data.email, {
+        redirectTo: getRedirectUrl(),
+      });
+      if (error) {
+        setAuthMessage(error.message, true);
+        return;
+      }
+      setAuthMessage("E-mail de recuperação enviado.");
+    });
+  }
+
+  const resetForm = document.getElementById("resetForm");
+  if (resetForm) {
+    resetForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!authState.client) {
+        setAuthMessage("Configure o acesso antes de redefinir senha.", true);
+        return;
+      }
+      const data = formToObject(event.currentTarget);
+      const { error } = await authState.client.auth.updateUser({ password: data.password });
+      if (error) {
+        setAuthMessage(error.message, true);
+        return;
+      }
+      setAuthMessage("Senha atualizada. Faça login novamente.");
+      switchAuthTab("login");
+      if (window.location.hash) window.history.replaceState({}, document.title, getRedirectUrl());
+    });
+  }
 
   document.getElementById("btnLogout").addEventListener("click", async () => {
     setLocalTestSession(false);

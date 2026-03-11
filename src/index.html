@@ -13,52 +13,35 @@
         <img class="auth-logo" src="./assets/logo-vila-marques.png" alt="Vila Marques Alojamentos" />
         <h2>Acesso ao Sistema</h2>
         <p class="small">Entre com seu usuário para acessar propostas, contracheques e balanço.</p>
-
-        <section class="auth-step">
-          <h3>Etapa 1: Escolha do modo</h3>
-          <p class="small">Configure o acesso seguro do sistema.</p>
-          <div class="auth-quick-actions">
-            <button id="btnToggleSupabaseConfig" class="btn" type="button">Configurar acesso</button>
+        <form id="authConfigForm" class="form-grid auth-hidden">
+          <label class="full">URL do servidor<input id="supabaseUrlInput" placeholder="https://seu-servidor.com" /></label>
+          <label class="full">Chave pública de acesso<input id="supabaseAnonKeyInput" placeholder="Cole a chave pública aqui" /></label>
+          <div class="full row-end">
+            <button class="btn" type="submit">Salvar configuração</button>
           </div>
-          <form id="authConfigForm" class="form-grid auth-hidden">
-            <label class="full">URL do servidor<input id="supabaseUrlInput" placeholder="https://seu-servidor.com" /></label>
-            <label class="full">Chave pública de acesso<input id="supabaseAnonKeyInput" placeholder="Cole a chave pública aqui" /></label>
-            <div class="full row-end">
-              <button class="btn" type="submit">Salvar configuração</button>
-            </div>
-          </form>
-        </section>
+        </form>
 
-        <section class="auth-step">
-          <h3>Etapa 2: Acesso</h3>
-          <div class="auth-tabs">
-          <button id="authTabLogin" class="tab-btn tab-btn-active" type="button">Login</button>
-          <button id="authTabSignup" class="tab-btn" type="button">Cadastro</button>
-          <button id="authTabForgot" class="tab-btn" type="button">Recuperar senha</button>
-          </div>
-
-          <form id="loginForm" class="form-grid">
+        <form id="loginForm" class="form-grid auth-step">
           <label class="full">Usuário ou e-mail<input name="email" type="text" required /></label>
           <label class="full">Senha<input name="password" type="password" required /></label>
           <div class="full row-end"><button class="btn btn-primary" type="submit">Entrar</button></div>
-          </form>
+        </form>
 
-          <form id="signupForm" class="form-grid auth-hidden">
+        <form id="signupForm" class="form-grid auth-hidden">
           <label class="full">E-mail<input name="email" type="email" required /></label>
           <label class="full">Senha<input name="password" type="password" minlength="6" required /></label>
           <div class="full row-end"><button class="btn btn-primary" type="submit">Criar conta</button></div>
-          </form>
+        </form>
 
-          <form id="forgotForm" class="form-grid auth-hidden">
+        <form id="forgotForm" class="form-grid auth-hidden">
           <label class="full">E-mail<input name="email" type="email" required /></label>
           <div class="full row-end"><button class="btn btn-primary" type="submit">Enviar recuperação</button></div>
-          </form>
+        </form>
 
-          <form id="resetForm" class="form-grid auth-hidden">
+        <form id="resetForm" class="form-grid auth-hidden">
           <label class="full">Nova senha<input name="password" type="password" minlength="6" required /></label>
           <div class="full row-end"><button class="btn btn-primary" type="submit">Atualizar senha</button></div>
-          </form>
-        </section>
+        </form>
 
         <div id="authMessage" class="small"></div>
       </div>
