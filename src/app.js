@@ -4,6 +4,9 @@ const SUPABASE_URL_KEY = "vm-supabase-url";
 const SUPABASE_ANON_KEY = "vm-supabase-anon-key";
 const AUTH_CONFIG_LOCK_KEY = "vm-auth-config-locked";
 const LOCAL_TEST_SESSION_KEY = "vm-local-test-session";
+const DEFAULT_SUPABASE_URL = "https://ohrjghkdrwqslvdtcleo.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY = "";
+const OWNER_ADMIN_EMAILS = new Set(["fmarquesescritorio@gmail.com"]);
 const CLOUD_STATE_SYNC_DEBOUNCE_MS = 1200;
 const LOCAL_TEST_EMAIL = "teste@vila.com";
 const LOCAL_TEST_USERNAME = "teste";
@@ -1218,8 +1221,8 @@ function setCloudSyncEndpoint(value) {
 
 function getSupabaseConfig() {
   return {
-    url: String(localStorage.getItem(SUPABASE_URL_KEY) || "").trim(),
-    anonKey: String(localStorage.getItem(SUPABASE_ANON_KEY) || "").trim(),
+    url: String(localStorage.getItem(SUPABASE_URL_KEY) || DEFAULT_SUPABASE_URL || "").trim(),
+    anonKey: String(localStorage.getItem(SUPABASE_ANON_KEY) || DEFAULT_SUPABASE_ANON_KEY || "").trim(),
   };
 }
 
@@ -1283,7 +1286,11 @@ function canViewFinancialValues() {
 
 function normalizePermissionsRow(row) {
   if (!row) return getDefaultPermissions();
-  if (Boolean(row.is_admin)) return getRolePermissions("administrador");
+  const isAdmin =
+    row.is_admin === true
+    || String(row.is_admin || "").trim().toLowerCase() === "true"
+    || String(row.role_category || "").trim().toLowerCase() === "administrador";
+  if (isAdmin) return getRolePermissions("administrador");
 
   // Regra fechada para categoria Funcionário:
   // nunca permite acesso aos módulos sensíveis e nem visualização de valores.
@@ -1319,6 +1326,12 @@ function canAccessTab(tabName) {
 }
 
 async function loadCurrentUserPermissions() {
+  const currentUserEmail = String(authState.user?.email || "").trim().toLowerCase();
+  if (OWNER_ADMIN_EMAILS.has(currentUserEmail)) {
+    authState.permissions = getRolePermissions("administrador");
+    return;
+  }
+
   if (authState.mode === "local") {
     authState.permissions = getRolePermissions("administrador");
     return;
@@ -1336,6 +1349,10 @@ async function loadCurrentUserPermissions() {
     .maybeSingle();
 
   if (error) {
+    if (OWNER_ADMIN_EMAILS.has(currentUserEmail)) {
+      authState.permissions = getRolePermissions("administrador");
+      return;
+    }
     authState.permissions = getDefaultPermissions();
     setAuthMessage("Usuário sem permissões configuradas. Acesso básico aplicado.", true);
     return;
@@ -5532,12 +5549,23 @@ function bindEvents() {
     cloudSyncState.saveTimer = null;
     cloudSyncState.hasLoadedFromCloud = false;
     cloudSyncState.pendingSave = false;
-    if (authState.client) await authState.client.auth.signOut();
+    if (authState.client) {
+      try {
+        await authState.client.auth.signOut();
+      } catch (error) {
+        console.warn("[auth] Falha ao encerrar sessão Supabase:", error);
+      }
+    }
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith("sb-") && key.includes("-auth-token")) localStorage.removeItem(key);
+    });
     authState.user = null;
     authState.mode = "none";
+    authState.permissions = getDefaultPermissions();
     showAppShell(false);
     switchAuthTab("login");
     setAuthMessage("Sessão encerrada.");
+    renderAll();
   });
 
   document.getElementById("tabProposals").addEventListener("click", () => {
