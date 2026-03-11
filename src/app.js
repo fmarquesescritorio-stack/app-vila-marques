@@ -1262,9 +1262,15 @@ function setCloudSyncEndpoint(value) {
 }
 
 function getSupabaseConfig() {
+  const storedUrl = String(localStorage.getItem(SUPABASE_URL_KEY) || "").trim();
+  const storedAnon = String(localStorage.getItem(SUPABASE_ANON_KEY) || "").trim();
+  const defaultUrl = String(DEFAULT_SUPABASE_URL || "").trim();
+  const defaultAnon = String(DEFAULT_SUPABASE_ANON_KEY || "").trim();
+  const url = /^https?:\/\//i.test(storedUrl) ? storedUrl : defaultUrl;
+  const anonKey = storedAnon.length > 12 ? storedAnon : defaultAnon;
   return {
-    url: String(localStorage.getItem(SUPABASE_URL_KEY) || DEFAULT_SUPABASE_URL || "").trim(),
-    anonKey: String(localStorage.getItem(SUPABASE_ANON_KEY) || DEFAULT_SUPABASE_ANON_KEY || "").trim(),
+    url,
+    anonKey,
   };
 }
 
@@ -1587,7 +1593,14 @@ async function initAuthClient() {
     return;
   }
 
-  authState.client = window.supabase.createClient(config.url, config.anonKey);
+  try {
+    authState.client = window.supabase.createClient(config.url, config.anonKey);
+  } catch (error) {
+    console.warn("[auth] Falha ao criar cliente de autenticação:", error);
+    setAuthMessage("Falha ao iniciar autenticação. Atualize a página e tente novamente.", true);
+    showAppShell(false);
+    return;
+  }
   authState.mode = "supabase";
   const { data } = await authState.client.auth.getSession();
   authState.user = data.session ? data.session.user : null;
@@ -5775,7 +5788,10 @@ function bindEvents() {
         return;
       }
       if (!authState.client) {
-        setAuthMessage("Configuração de acesso necessária para login.", true);
+        await initAuthClient();
+      }
+      if (!authState.client) {
+        setAuthMessage("Serviço de login indisponível no momento. Tente novamente.", true);
         return;
       }
       const { error } = await authState.client.auth.signInWithPassword({
