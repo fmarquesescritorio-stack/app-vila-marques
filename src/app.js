@@ -1065,6 +1065,7 @@ function getSnapshotSavedAt(value) {
 async function saveCloudStateNow() {
   if (cloudSyncState.suppressSave) return;
   if (authState.mode !== "supabase" || !authState.client || !authState.user) return;
+  if (!cloudSyncState.hasLoadedFromCloud) return;
   if (cloudSyncState.saveInFlight) {
     cloudSyncState.pendingSave = true;
     return;
@@ -1099,6 +1100,7 @@ async function saveCloudStateNow() {
 function scheduleCloudStateSave() {
   if (cloudSyncState.suppressSave) return;
   if (authState.mode !== "supabase" || !authState.client || !authState.user) return;
+  if (!cloudSyncState.hasLoadedFromCloud) return;
   if (cloudSyncState.saveTimer) clearTimeout(cloudSyncState.saveTimer);
   cloudSyncState.saveTimer = setTimeout(() => {
     cloudSyncState.saveTimer = null;
@@ -1310,6 +1312,19 @@ function hasPermission(permissionKey) {
   return Boolean(permissions[permissionKey]);
 }
 
+function getUserDisplayNameFromEmail() {
+  const email = String(authState.user?.email || "").trim().toLowerCase();
+  if (!email) return "Usuário";
+  const localPart = email.split("@")[0] || "Usuário";
+  const tokens = localPart
+    .replace(/[._-]+/g, " ")
+    .split(" ")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const firstName = tokens[0] || localPart;
+  return firstName.charAt(0).toUpperCase() + firstName.slice(1);
+}
+
 function canAccessTab(tabName) {
   const map = {
     proposals: "accessProposals",
@@ -1395,6 +1410,7 @@ function applyPermissionsUi() {
   if (btnSaveContract) btnSaveContract.style.display = hasPermission("editContracts") ? "" : "none";
 
   const roleBadge = document.getElementById("userRoleBadge");
+  const welcome = document.getElementById("userWelcome");
   if (roleBadge) {
     const role = getUserRoleCategory();
     if (role === "administrador") {
@@ -1404,6 +1420,10 @@ function applyPermissionsUi() {
       roleBadge.textContent = "Funcionário";
       roleBadge.className = "role-badge role-badge-employee";
     }
+  }
+  if (welcome) {
+    const name = authState.user ? getUserDisplayNameFromEmail() : "Usuário";
+    welcome.textContent = `Bem-vindo(a), ${name}.`;
   }
 
   document.body.classList.toggle("balance-values-blurred", !canViewFinancialValues());
