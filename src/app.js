@@ -6,7 +6,10 @@ const AUTH_CONFIG_LOCK_KEY = "vm-auth-config-locked";
 const LOCAL_TEST_SESSION_KEY = "vm-local-test-session";
 const DEFAULT_SUPABASE_URL = "https://ohrjghkdrwqslvdtcleo.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_toVTnlfbkYpprefiRvfo1w_BbwyrdKO";
-const OWNER_ADMIN_EMAILS = new Set(["fmarquesescritorio@gmail.com"]);
+const OWNER_ADMIN_EMAILS = new Set([
+  "fmarquesescritorio@gmail.com",
+  "lu.priscila@hotmail.com",
+]);
 const CLOUD_STATE_SYNC_DEBOUNCE_MS = 1200;
 const LOCAL_TEST_EMAIL = "teste@vila.com";
 const LOCAL_TEST_USERNAME = "teste";
