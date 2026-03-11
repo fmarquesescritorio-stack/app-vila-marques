@@ -16,12 +16,10 @@
 
         <section class="auth-step">
           <h3>Etapa 1: Escolha do modo</h3>
-          <p class="small">Para testes rápidos, use o login padrão local. Para produção, configure Supabase.</p>
+          <p class="small">Configure o Supabase para autenticação segura no sistema.</p>
           <div class="auth-quick-actions">
-            <button id="btnUseTestAccess" class="btn" type="button">Usar login de teste</button>
             <button id="btnToggleSupabaseConfig" class="btn" type="button">Configurar Supabase</button>
           </div>
-          <p class="small">Login de teste: usuário <code>teste</code> (ou <code>teste@vila.com</code>) / senha: <code>teste</code></p>
           <form id="authConfigForm" class="form-grid auth-hidden">
             <label class="full">Supabase URL<input id="supabaseUrlInput" placeholder="https://xxxx.supabase.co" /></label>
             <label class="full">Supabase Anon Key<input id="supabaseAnonKeyInput" placeholder="Cole a chave anon aqui" /></label>

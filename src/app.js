@@ -5,13 +5,13 @@ const SUPABASE_ANON_KEY = "vm-supabase-anon-key";
 const AUTH_CONFIG_LOCK_KEY = "vm-auth-config-locked";
 const LOCAL_TEST_SESSION_KEY = "vm-local-test-session";
 const DEFAULT_SUPABASE_URL = "https://ohrjghkdrwqslvdtcleo.supabase.co";
-const DEFAULT_SUPABASE_ANON_KEY = "";
+const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_toVTnlfbkYpprefiRvfo1w_BbwyrdKO";
 const OWNER_ADMIN_EMAILS = new Set(["fmarquesescritorio@gmail.com"]);
 const CLOUD_STATE_SYNC_DEBOUNCE_MS = 1200;
 const LOCAL_TEST_EMAIL = "teste@vila.com";
 const LOCAL_TEST_USERNAME = "teste";
 const LOCAL_TEST_PASSWORD = "teste";
-const ALLOW_LOCAL_TEST_LOGIN = true;
+const ALLOW_LOCAL_TEST_LOGIN = false;
 const ALLOW_PUBLIC_SIGNUP = false;
 const FIXED_LOGO_PATH = "./assets/logo-vila-marques.png";
 const CONTRACTOR_INFO = {
@@ -1501,8 +1501,8 @@ async function initAuthClient() {
 
   if (!config.url || !config.anonKey) {
     const setupMsg = canEditAuthConfig()
-      ? "Sem Supabase configurado. Use o login de teste (teste/teste) ou configure Supabase."
-      : "Configuração de autenticação bloqueada. Use o login de teste.";
+      ? "Sem Supabase configurado. Configure Supabase para continuar."
+      : "Configuração de autenticação bloqueada.";
     setAuthMessage(setupMsg, true);
     showAppShell(false);
     return;
@@ -5422,19 +5422,12 @@ function bindEvents() {
   document.getElementById("btnToggleSupabaseConfig").addEventListener("click", () => {
     toggleSupabaseConfig();
   });
-  document.getElementById("btnUseTestAccess").addEventListener("click", async () => {
-    if (!ALLOW_LOCAL_TEST_LOGIN) {
+  const btnUseTestAccess = document.getElementById("btnUseTestAccess");
+  if (btnUseTestAccess) {
+    btnUseTestAccess.addEventListener("click", () => {
       setAuthMessage("Login de teste desativado.", true);
-      return;
-    }
-    setLocalTestSession(true);
-    authState.mode = "local";
-    authState.user = { email: LOCAL_TEST_EMAIL };
-    await loadCurrentUserPermissions();
-    showAppShell(true);
-    setAuthMessage("Acesso de teste local ativado.");
-    renderAll();
-  });
+    });
+  }
 
   document.getElementById("authConfigForm").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -5465,11 +5458,7 @@ function bindEvents() {
       return;
     }
     if (!authState.client) {
-      if (!ALLOW_LOCAL_TEST_LOGIN) {
-        setAuthMessage("Configuração do Supabase necessária para login.", true);
-        return;
-      }
-      setAuthMessage("Configure o Supabase ou use o login de teste.", true);
+      setAuthMessage("Configuração do Supabase necessária para login.", true);
       return;
     }
     const { error } = await authState.client.auth.signInWithPassword({
