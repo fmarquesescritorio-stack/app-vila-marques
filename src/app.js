@@ -648,9 +648,11 @@ function applyBRLMask(input) {
 function setupBRLInputs(container) {
   if (!container) return;
   container.querySelectorAll("input[data-brl]").forEach((input) => {
+    if (!String(input.value || "").trim()) input.value = "R$ 0,00";
+    else input.value = formatBRLInputValue(input.value);
+
     if (input.dataset.brlBound === "1") return;
     input.dataset.brlBound = "1";
-    if (!String(input.value || "").trim()) input.value = "R$ 0,00";
     input.addEventListener("input", () => applyBRLMask(input));
     input.addEventListener("blur", () => {
       input.value = formatBRLInputValue(input.value);
@@ -5146,9 +5148,6 @@ function renderContractSimulation() {
   panel.classList.toggle("auth-hidden", !uiState.contractsSimulationOpen);
   if (!uiState.contractsSimulationOpen) return;
 
-  setFormValues(form, uiState.contractsSimulation);
-  setupBRLInputs(form);
-
   const result = calculateContractSimulationResult(uiState.contractsSimulation);
   if (!result.valid) {
     resultBox.innerHTML = `
@@ -7250,6 +7249,11 @@ function bindEvents() {
   document.getElementById("btnOpenContractSimulation")?.addEventListener("click", () => {
     uiState.contractsSimulationOpen = true;
     if (!uiState.contractsSimulation) uiState.contractsSimulation = createEmptyContractSimulation();
+    const form = document.getElementById("contractsSimulationForm");
+    if (form) {
+      setFormValues(form, uiState.contractsSimulation);
+      setupBRLInputs(form);
+    }
     renderContracts();
   });
 
@@ -7261,6 +7265,11 @@ function bindEvents() {
 
   document.getElementById("btnClearContractSimulation")?.addEventListener("click", () => {
     uiState.contractsSimulation = createEmptyContractSimulation();
+    const form = document.getElementById("contractsSimulationForm");
+    if (form) {
+      setFormValues(form, uiState.contractsSimulation);
+      setupBRLInputs(form);
+    }
     renderContractSimulation();
   });
 
