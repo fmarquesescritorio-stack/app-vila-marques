@@ -127,6 +127,22 @@ const uiState = {
   contractsEditMode: false,
   contractsVisibleValuesById: {},
   contractsSummaryVisible: false,
+  contractsSimulationOpen: false,
+  contractsSimulation: {
+    capacity: "0",
+    monthlyTaxPercent: "0",
+    targetMonthlyProfit: "0",
+    dailyRatePerPerson: "0",
+    rentCost: "0",
+    staffCost: "0",
+    furnitureCost: "0",
+    cleaningProductsCost: "0",
+    waterCost: "0",
+    electricityCost: "0",
+    internetCost: "0",
+    maintenanceCost: "0",
+    proLaboreCost: "0",
+  },
   rentedPropertiesFormOpen: false,
   editingRentedPropertyId: "",
   notificationsOpen: false,
@@ -298,6 +314,24 @@ function createEmptyRentedProperty() {
     paymentHistory: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+  };
+}
+
+function createEmptyContractSimulation() {
+  return {
+    capacity: "0",
+    monthlyTaxPercent: "0",
+    targetMonthlyProfit: "0",
+    dailyRatePerPerson: "0",
+    rentCost: "0",
+    staffCost: "0",
+    furnitureCost: "0",
+    cleaningProductsCost: "0",
+    waterCost: "0",
+    electricityCost: "0",
+    internetCost: "0",
+    maintenanceCost: "0",
+    proLaboreCost: "0",
   };
 }
 
@@ -1769,6 +1803,8 @@ function resetActiveTabInputs() {
   if (uiState.activeTab === "contracts") {
     resetContractsDraftForm(false);
     uiState.contractsFormOpen = false;
+    uiState.contractsSimulationOpen = false;
+    uiState.contractsSimulation = createEmptyContractSimulation();
     return;
   }
 
@@ -1816,6 +1852,8 @@ function resetModuleUiState(moduleName) {
     uiState.contractsFormOpen = false;
     uiState.contractsEditMode = false;
     uiState.contractsSummaryVisible = false;
+    uiState.contractsSimulationOpen = false;
+    uiState.contractsSimulation = createEmptyContractSimulation();
     uiState.contractsSavedView = "effective";
     uiState.contractsVisibleValuesById = {};
     return;
@@ -5032,6 +5070,110 @@ function calculateContractsResult(contractData = state.contracts) {
   };
 }
 
+function calculateContractSimulationResult(simulationData = uiState.contractsSimulation) {
+  const capacity = Math.max(0, Number(simulationData.capacity || 0));
+  const monthlyTaxPercent = Math.max(0, Number(simulationData.monthlyTaxPercent || 0));
+  const taxFactor = 1 - (monthlyTaxPercent / 100);
+
+  const rentCost = Number(simulationData.rentCost || 0);
+  const staffCost = Number(simulationData.staffCost || 0);
+  const furnitureCost = Number(simulationData.furnitureCost || 0);
+  const cleaningProductsCost = Number(simulationData.cleaningProductsCost || 0);
+  const waterCost = Number(simulationData.waterCost || 0);
+  const electricityCost = Number(simulationData.electricityCost || 0);
+  const internetCost = Number(simulationData.internetCost || 0);
+  const maintenanceCost = Number(simulationData.maintenanceCost || 0);
+  const proLaboreCost = Number(simulationData.proLaboreCost || 0);
+  const targetMonthlyProfit = Number(simulationData.targetMonthlyProfit || 0);
+  const enteredDailyRate = Number(simulationData.dailyRatePerPerson || 0);
+
+  const recurringFixedCosts =
+    rentCost
+    + staffCost
+    + cleaningProductsCost
+    + waterCost
+    + electricityCost
+    + internetCost
+    + maintenanceCost
+    + proLaboreCost;
+
+  if (capacity <= 0 || taxFactor <= 0) {
+    return {
+      capacity,
+      monthlyTaxPercent,
+      recurringFixedCosts,
+      furnitureCost,
+      targetMonthlyProfit,
+      valid: false,
+    };
+  }
+
+  const requiredRevenueForBreakEven = recurringFixedCosts / taxFactor;
+  const requiredDailyForBreakEven = requiredRevenueForBreakEven / (capacity * 30);
+  const requiredRevenueForTarget = (recurringFixedCosts + Math.max(0, targetMonthlyProfit)) / taxFactor;
+  const requiredDailyForTarget = requiredRevenueForTarget / (capacity * 30);
+
+  const simulatedMonthlyRevenue = Math.max(0, enteredDailyRate) * capacity * 30;
+  const simulatedMonthlyTax = simulatedMonthlyRevenue * (monthlyTaxPercent / 100);
+  const simulatedMonthlyProfit = simulatedMonthlyRevenue - recurringFixedCosts - simulatedMonthlyTax;
+  const simulatedFirstMonthProfit = simulatedMonthlyProfit - furnitureCost;
+
+  return {
+    capacity,
+    monthlyTaxPercent,
+    recurringFixedCosts,
+    furnitureCost,
+    targetMonthlyProfit: Math.max(0, targetMonthlyProfit),
+    valid: true,
+    requiredRevenueForBreakEven,
+    requiredDailyForBreakEven,
+    requiredRevenueForTarget,
+    requiredDailyForTarget,
+    enteredDailyRate: Math.max(0, enteredDailyRate),
+    simulatedMonthlyRevenue,
+    simulatedMonthlyTax,
+    simulatedMonthlyProfit,
+    simulatedFirstMonthProfit,
+  };
+}
+
+function renderContractSimulation() {
+  const panel = document.getElementById("contractsSimulationPanel");
+  const form = document.getElementById("contractsSimulationForm");
+  const resultBox = document.getElementById("contractsSimulationResult");
+  if (!panel || !form || !resultBox) return;
+
+  panel.classList.toggle("auth-hidden", !uiState.contractsSimulationOpen);
+  if (!uiState.contractsSimulationOpen) return;
+
+  setFormValues(form, uiState.contractsSimulation);
+  setupBRLInputs(form);
+
+  const result = calculateContractSimulationResult(uiState.contractsSimulation);
+  if (!result.valid) {
+    resultBox.innerHTML = `
+      <div class="small">Informe capacidade de pessoas maior que zero e alíquota menor que 100% para simular.</div>
+    `;
+    return;
+  }
+
+  resultBox.innerHTML = `
+    <div class="balance-summary-grid">
+      <div class="balance-summary-card"><div class="label">Custos recorrentes mensais</div><div class="value balance-expense">${currencyBRL.format(result.recurringFixedCosts)}</div></div>
+      <div class="balance-summary-card"><div class="label">Diária para empatar</div><div class="value">${currencyBRL.format(result.requiredDailyForBreakEven)}</div></div>
+      <div class="balance-summary-card"><div class="label">Diária para lucro alvo</div><div class="value balance-income">${currencyBRL.format(result.requiredDailyForTarget)}</div></div>
+      <div class="balance-summary-card"><div class="label">Lucro alvo mensal</div><div class="value">${currencyBRL.format(result.targetMonthlyProfit)}</div></div>
+      <div class="balance-summary-card"><div class="label">Diária simulada informada</div><div class="value">${currencyBRL.format(result.enteredDailyRate)}</div></div>
+      <div class="balance-summary-card"><div class="label">Lucro mensal simulado</div><div class="value ${result.simulatedMonthlyProfit >= 0 ? "balance-income" : "balance-expense"}">${currencyBRL.format(result.simulatedMonthlyProfit)}</div></div>
+      <div class="balance-summary-card"><div class="label">Lucro 1º mês (com mobília)</div><div class="value ${result.simulatedFirstMonthProfit >= 0 ? "balance-income" : "balance-expense"}">${currencyBRL.format(result.simulatedFirstMonthProfit)}</div></div>
+      <div class="balance-summary-card"><div class="label">Imposto mensal simulado</div><div class="value balance-expense">${currencyBRL.format(result.simulatedMonthlyTax)}</div></div>
+    </div>
+    <div class="small" style="margin-top: 8px;">
+      Simulação temporária: não salva dados e é limpa ao fechar/sair da aba de contratos.
+    </div>
+  `;
+}
+
 function getContractsFormPayload() {
   const contractsForm = document.getElementById("contractsForm");
   if (!contractsForm) return null;
@@ -5048,6 +5190,8 @@ function resetContractsDraftForm(closeForm = true) {
   if (closeForm) uiState.contractsFormOpen = false;
   uiState.contractsEditMode = false;
   uiState.contractsSummaryVisible = false;
+  uiState.contractsSimulationOpen = false;
+  uiState.contractsSimulation = createEmptyContractSimulation();
 }
 
 function saveContractFromForm({ isEffective }) {
@@ -5236,6 +5380,7 @@ function renderContracts() {
   btnShowEffective.classList.toggle("btn-primary", uiState.contractsSavedView === "effective");
   btnShowDraft.classList.toggle("btn-primary", uiState.contractsSavedView === "draft");
   renderContractsOpenSummary();
+  renderContractSimulation();
   const btnToggleSummary = document.getElementById("btnToggleContractSummaryValues");
   if (btnToggleSummary) {
     btnToggleSummary.onclick = () => {
@@ -7055,6 +7200,36 @@ function bindEvents() {
     renderContractsOpenSummary();
   });
 
+  const contractsSimulationForm = document.getElementById("contractsSimulationForm");
+  if (contractsSimulationForm) {
+    setupBRLInputs(contractsSimulationForm);
+    const syncSimulationFromForm = () => {
+      const payload = formToObject(contractsSimulationForm);
+      const normalized = { ...createEmptyContractSimulation(), ...payload };
+      [
+        "targetMonthlyProfit",
+        "dailyRatePerPerson",
+        "rentCost",
+        "staffCost",
+        "furnitureCost",
+        "cleaningProductsCost",
+        "waterCost",
+        "electricityCost",
+        "internetCost",
+        "maintenanceCost",
+        "proLaboreCost",
+      ].forEach((field) => {
+        normalized[field] = String(parseBRLNumber(normalized[field] || 0));
+      });
+      normalized.capacity = String(Math.max(0, Number(normalized.capacity || 0)));
+      normalized.monthlyTaxPercent = String(Math.max(0, Number(normalized.monthlyTaxPercent || 0)));
+      uiState.contractsSimulation = normalized;
+      renderContractSimulation();
+    };
+    contractsSimulationForm.addEventListener("input", syncSimulationFromForm);
+    contractsSimulationForm.addEventListener("change", syncSimulationFromForm);
+  }
+
   document.getElementById("btnNewContract").addEventListener("click", () => {
     if (!hasPermission("editContracts")) {
       alert("Sem permissão para editar contratos.");
@@ -7070,6 +7245,23 @@ function bindEvents() {
       const contractNameInput = contractsForm?.elements?.namedItem("contractName");
       if (contractNameInput) contractNameInput.focus();
     });
+  });
+
+  document.getElementById("btnOpenContractSimulation")?.addEventListener("click", () => {
+    uiState.contractsSimulationOpen = true;
+    if (!uiState.contractsSimulation) uiState.contractsSimulation = createEmptyContractSimulation();
+    renderContracts();
+  });
+
+  document.getElementById("btnCloseContractSimulation")?.addEventListener("click", () => {
+    uiState.contractsSimulationOpen = false;
+    uiState.contractsSimulation = createEmptyContractSimulation();
+    renderContracts();
+  });
+
+  document.getElementById("btnClearContractSimulation")?.addEventListener("click", () => {
+    uiState.contractsSimulation = createEmptyContractSimulation();
+    renderContractSimulation();
   });
 
   document.getElementById("btnSaveContractDraft").addEventListener("click", () => {
@@ -7568,6 +7760,8 @@ function bindEvents() {
       clearTaxesForm();
     } else if (uiState.activeTab === "contracts") {
       document.getElementById("contractsForm")?.reset();
+      uiState.contractsSimulationOpen = false;
+      uiState.contractsSimulation = createEmptyContractSimulation();
     } else if (uiState.activeTab === "rentedProperties") {
       resetRentedPropertyForm();
     } else if (uiState.activeTab === "exports") {

@@ -660,9 +660,35 @@
           <div id="contractsTopActions" class="balance-controls">
             <div class="balance-mode-switch">
               <button id="btnNewContract" type="button" class="btn">Novo contrato</button>
+              <button id="btnOpenContractSimulation" type="button" class="btn">Simular contrato</button>
               <button id="btnSaveContractDraft" type="button" class="btn">Salvar rascunho</button>
               <button id="btnSaveContract" type="button" class="btn btn-primary">Salvar contrato</button>
             </div>
+          </div>
+          <div id="contractsSimulationPanel" class="panel auth-hidden" style="margin-bottom: 12px;">
+            <div class="balance-controls" style="margin-bottom: 8px;">
+              <strong>Simulação de Contrato (temporária)</strong>
+              <div class="balance-mode-switch">
+                <button id="btnClearContractSimulation" type="button" class="btn">Limpar simulação</button>
+                <button id="btnCloseContractSimulation" type="button" class="btn">Fechar simulação</button>
+              </div>
+            </div>
+            <form id="contractsSimulationForm" class="form-grid">
+              <label>Capacidade de pessoas<input name="capacity" type="number" min="1" value="0" /></label>
+              <label>Imposto mensal sobre faturamento (%)<input name="monthlyTaxPercent" type="number" min="0" step="0.01" value="0" /></label>
+              <label>Lucro alvo mensal (R$)<input name="targetMonthlyProfit" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Diária por pessoa para testar (R$)<input name="dailyRatePerPerson" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Aluguel (R$)<input name="rentCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Funcionário (R$)<input name="staffCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Mobília (R$) - custo único<input name="furnitureCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Produtos de limpeza (R$)<input name="cleaningProductsCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Água (R$)<input name="waterCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Luz (R$)<input name="electricityCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Internet (R$)<input name="internetCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Manutenções (R$)<input name="maintenanceCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Pró-labore (R$)<input name="proLaboreCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+            </form>
+            <div id="contractsSimulationResult" class="balance-summary" style="margin-top: 10px;"></div>
           </div>
           <div id="contractsFormContainer" class="panel auth-hidden" style="margin-bottom: 12px;">
             <h3 style="margin-top: 0;">Preenchimento do Contrato</h3>
