@@ -5076,6 +5076,7 @@ function calculateContractSimulationResult(simulationData = uiState.contractsSim
   const capacity = Math.max(0, Number(simulationData.capacity || 0));
   const monthlyTaxPercent = Math.max(0, Number(simulationData.monthlyTaxPercent || 0));
   const taxFactor = 1 - (monthlyTaxPercent / 100);
+  const healthyPartnerSharePercent = 30;
 
   const rentCost = Number(simulationData.rentCost || 0);
   const staffCost = Number(simulationData.staffCost || 0);
@@ -5119,6 +5120,8 @@ function calculateContractSimulationResult(simulationData = uiState.contractsSim
   const simulatedMonthlyTax = simulatedMonthlyRevenue * (monthlyTaxPercent / 100);
   const simulatedMonthlyProfit = simulatedMonthlyRevenue - recurringFixedCosts - simulatedMonthlyTax;
   const simulatedFirstMonthProfit = simulatedMonthlyProfit - furnitureCost;
+  const furnitureBreakEvenMonths = simulatedMonthlyProfit > 0 ? (furnitureCost / simulatedMonthlyProfit) : null;
+  const healthyPartnerShareValue = Math.max(0, simulatedMonthlyProfit) * (healthyPartnerSharePercent / 100);
 
   return {
     capacity,
@@ -5136,6 +5139,9 @@ function calculateContractSimulationResult(simulationData = uiState.contractsSim
     simulatedMonthlyTax,
     simulatedMonthlyProfit,
     simulatedFirstMonthProfit,
+    furnitureBreakEvenMonths,
+    healthyPartnerSharePercent,
+    healthyPartnerShareValue,
   };
 }
 
@@ -5149,6 +5155,9 @@ function renderContractSimulation() {
   if (!uiState.contractsSimulationOpen) return;
 
   const result = calculateContractSimulationResult(uiState.contractsSimulation);
+  const furnitureBreakEvenText = Number.isFinite(result.furnitureBreakEvenMonths)
+    ? `${Number(result.furnitureBreakEvenMonths).toFixed(1)} meses`
+    : "Sem previsão";
   if (!result.valid) {
     resultBox.innerHTML = `
       <div class="small">Informe capacidade de pessoas maior que zero e alíquota menor que 100% para simular.</div>
@@ -5158,6 +5167,7 @@ function renderContractSimulation() {
 
   resultBox.innerHTML = `
     <div class="balance-summary-grid">
+      <div class="balance-summary-card"><div class="label">Valor total do contrato (30 dias)</div><div class="value balance-income">${currencyBRL.format(result.simulatedMonthlyRevenue)}</div></div>
       <div class="balance-summary-card"><div class="label">Custos recorrentes mensais</div><div class="value balance-expense">${currencyBRL.format(result.recurringFixedCosts)}</div></div>
       <div class="balance-summary-card"><div class="label">Diária para empatar</div><div class="value">${currencyBRL.format(result.requiredDailyForBreakEven)}</div></div>
       <div class="balance-summary-card"><div class="label">Diária para lucro alvo</div><div class="value balance-income">${currencyBRL.format(result.requiredDailyForTarget)}</div></div>
@@ -5165,6 +5175,8 @@ function renderContractSimulation() {
       <div class="balance-summary-card"><div class="label">Diária simulada informada</div><div class="value">${currencyBRL.format(result.enteredDailyRate)}</div></div>
       <div class="balance-summary-card"><div class="label">Lucro mensal simulado</div><div class="value ${result.simulatedMonthlyProfit >= 0 ? "balance-income" : "balance-expense"}">${currencyBRL.format(result.simulatedMonthlyProfit)}</div></div>
       <div class="balance-summary-card"><div class="label">Lucro 1º mês (com mobília)</div><div class="value ${result.simulatedFirstMonthProfit >= 0 ? "balance-income" : "balance-expense"}">${currencyBRL.format(result.simulatedFirstMonthProfit)}</div></div>
+      <div class="balance-summary-card"><div class="label">Breakeven da mobília</div><div class="value">${furnitureBreakEvenText}</div></div>
+      <div class="balance-summary-card"><div class="label">Participação saudável do sócio (${result.healthyPartnerSharePercent}% do lucro)</div><div class="value">${currencyBRL.format(result.healthyPartnerShareValue)}</div></div>
       <div class="balance-summary-card"><div class="label">Imposto mensal simulado</div><div class="value balance-expense">${currencyBRL.format(result.simulatedMonthlyTax)}</div></div>
     </div>
     <div class="small" style="margin-top: 8px;">
