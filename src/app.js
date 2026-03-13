@@ -1144,19 +1144,6 @@ async function saveCloudStateNow() {
   cloudSyncState.saveInFlight = true;
   try {
     const payload = getStateSnapshot();
-    try {
-      const { data: currentCloud } = await authState.client
-        .from("app_user_state")
-        .select("state_data")
-        .eq("user_id", authState.user.id)
-        .maybeSingle();
-      const cloudExports = Array.isArray(currentCloud?.state_data?.exports)
-        ? currentCloud.state_data.exports
-        : [];
-      payload.exports = mergeExportRecords(payload.exports, cloudExports);
-    } catch (_error) {
-      // Se não conseguir ler estado atual da nuvem, mantém o payload local.
-    }
     const { error } = await authState.client
       .from("app_user_state")
       .upsert(
@@ -1212,27 +1199,20 @@ async function syncStateFromCloudOnLogin() {
     const localSavedAt = getSnapshotSavedAt(localSnapshot);
     const cloudSnapshot = data?.state_data && typeof data.state_data === "object" ? data.state_data : null;
     const cloudSavedAt = getSnapshotSavedAt(cloudSnapshot) || (data?.updated_at ? new Date(data.updated_at) : null);
-    const mergedExports = mergeExportRecords(localSnapshot?.exports, cloudSnapshot?.exports);
 
     cloudSyncState.suppressSave = true;
     if (cloudSnapshot && (!localSavedAt || (cloudSavedAt && cloudSavedAt > localSavedAt))) {
-      const mergedCloudSnapshot = cloneSnapshot(cloudSnapshot);
-      mergedCloudSnapshot.exports = mergedExports;
-      applyStateSnapshot(mergedCloudSnapshot);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedCloudSnapshot));
+      applyStateSnapshot(cloudSnapshot);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudSnapshot));
     } else if (localSnapshot) {
-      const mergedLocalSnapshot = cloneSnapshot(localSnapshot);
-      mergedLocalSnapshot.exports = mergedExports;
-      applyStateSnapshot(mergedLocalSnapshot);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedLocalSnapshot));
+      applyStateSnapshot(localSnapshot);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(localSnapshot));
       if (!cloudSnapshot || (localSavedAt && (!cloudSavedAt || localSavedAt > cloudSavedAt))) {
         await saveCloudStateNow();
       }
     } else if (cloudSnapshot) {
-      const mergedCloudSnapshot = cloneSnapshot(cloudSnapshot);
-      mergedCloudSnapshot.exports = mergedExports;
-      applyStateSnapshot(mergedCloudSnapshot);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedCloudSnapshot));
+      applyStateSnapshot(cloudSnapshot);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudSnapshot));
     }
     cloudSyncState.suppressSave = false;
     cloudSyncState.hasLoadedFromCloud = true;
@@ -8273,7 +8253,15 @@ function bindEvents() {
       state.exports = (state.exports || []).filter((entry) => entry.id !== exportId);
       cloudSyncState.sharedExports = (cloudSyncState.sharedExports || []).filter((entry) => entry.id !== exportId);
       saveState();
-      void deleteSharedExportFromCloud(exportId);
+      void deleteSharedExportFromCloud(exportId).then(async (ok) => {
+        if (!ok && authState.mode === "supabase") {
+          alert("Não foi possível apagar este exportado na nuvem. Verifique permissões do usuário.");
+        }
+        if (authState.mode === "supabase" && authState.user) {
+          await loadSharedExportsFromCloud(true);
+          renderExports();
+        }
+      });
       void logAuditAction({
         action: "delete",
         module: "exports",
