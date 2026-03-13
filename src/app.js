@@ -165,6 +165,9 @@ const cloudSyncState = {
   pendingSave: false,
   suppressSave: false,
   hasLoadedFromCloud: false,
+  sharedExports: [],
+  sharedExportsLoaded: false,
+  sharedExportsLoading: false,
 };
 
 const DEFAULT_APP_PERMISSIONS = {
@@ -1660,9 +1663,11 @@ async function initAuthClient() {
   authState.client.auth.onAuthStateChange(async (_event, session) => {
     authState.user = session ? session.user : null;
     cloudSyncState.hasLoadedFromCloud = false;
+    cloudSyncState.sharedExportsLoaded = false;
     await loadCurrentUserPermissions();
     if (authState.user) {
       await syncStateFromCloudOnLogin();
+      await loadSharedExportsFromCloud(true);
     }
     showAppShell(Boolean(authState.user));
     renderAll();
@@ -1682,6 +1687,7 @@ async function initAuthClient() {
     setAuthMessage("Faça login para continuar.");
   } else {
     await syncStateFromCloudOnLogin();
+    await loadSharedExportsFromCloud(true);
   }
   renderAll();
 }
@@ -1703,6 +1709,79 @@ async function syncExportToCloud(exportRecord) {
   }
 }
 
+async function upsertSharedExportToCloud(exportRecord) {
+  if (authState.mode !== "supabase" || !authState.client || !authState.user) return false;
+  if (!exportRecord?.id) return false;
+  try {
+    const payload = {
+      export_id: String(exportRecord.id),
+      type: exportRecord.type === "payslip" ? "payslip" : "proposal",
+      exported_at: String(exportRecord.exportedAt || new Date().toISOString()),
+      proposal_number: String(exportRecord.proposalNumber || "").trim() || null,
+      company_name: String(exportRecord.companyName || "").trim() || null,
+      snapshot: exportRecord.snapshot && typeof exportRecord.snapshot === "object" ? exportRecord.snapshot : {},
+      created_by: authState.user.id,
+      created_by_email: String(authState.user.email || "").trim().toLowerCase() || null,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await authState.client
+      .from("app_shared_exports")
+      .upsert(payload, { onConflict: "export_id" });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+async function deleteSharedExportFromCloud(exportId) {
+  if (authState.mode !== "supabase" || !authState.client || !authState.user) return false;
+  if (!exportId) return false;
+  try {
+    const { error } = await authState.client
+      .from("app_shared_exports")
+      .delete()
+      .eq("export_id", String(exportId));
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+async function loadSharedExportsFromCloud(force = false) {
+  if (authState.mode !== "supabase" || !authState.client || !authState.user) return;
+  if (!force && cloudSyncState.sharedExportsLoaded) return;
+  if (cloudSyncState.sharedExportsLoading) return;
+  cloudSyncState.sharedExportsLoading = true;
+  try {
+    const { data, error } = await authState.client
+      .from("app_shared_exports")
+      .select("export_id, type, exported_at, proposal_number, company_name, snapshot, created_by_email")
+      .order("exported_at", { ascending: false })
+      .limit(500);
+    if (error) {
+      cloudSyncState.sharedExports = [];
+      cloudSyncState.sharedExportsLoaded = false;
+      return;
+    }
+    cloudSyncState.sharedExports = (Array.isArray(data) ? data : []).map((entry) => normalizeExportRecord({
+      id: entry.export_id,
+      type: entry.type,
+      exportedAt: entry.exported_at,
+      proposalNumber: entry.proposal_number,
+      companyName: entry.company_name,
+      snapshot: entry.snapshot,
+      cloudStatus: "synced",
+      createdByEmail: entry.created_by_email,
+    }));
+    cloudSyncState.sharedExportsLoaded = true;
+  } catch {
+    cloudSyncState.sharedExports = [];
+    cloudSyncState.sharedExportsLoaded = false;
+  } finally {
+    cloudSyncState.sharedExportsLoading = false;
+  }
+}
+
 function cloneSnapshot(data) {
   return JSON.parse(JSON.stringify(data));
 }
@@ -1716,6 +1795,7 @@ function normalizeExportRecord(item) {
     companyName: String(item?.companyName || "").trim(),
     snapshot: item?.snapshot && typeof item.snapshot === "object" ? item.snapshot : {},
     cloudStatus: String(item?.cloudStatus || "pending"),
+    createdByEmail: String(item?.createdByEmail || "").trim().toLowerCase(),
   };
 }
 
@@ -1744,6 +1824,10 @@ function mergeExportRecords(primaryList, secondaryList) {
     .slice(0, 500);
 }
 
+function getAllAvailableExports() {
+  return mergeExportRecords(state.exports || [], cloudSyncState.sharedExports || []);
+}
+
 function registerExport(type) {
   const exportRecord = {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -1763,6 +1847,7 @@ function registerExport(type) {
       contracts: state.contracts,
     }),
     cloudStatus: "pending",
+    createdByEmail: String(authState.user?.email || "").trim().toLowerCase(),
   };
 
   state.exports = [exportRecord, ...(state.exports || [])].slice(0, 500);
@@ -1786,6 +1871,11 @@ function registerExport(type) {
     if (idx < 0) return;
     state.exports[idx].cloudStatus = ok ? "synced" : "failed";
     saveState();
+    renderExports();
+  });
+  void upsertSharedExportToCloud(exportRecord).then(async (ok) => {
+    if (!ok) return;
+    await loadSharedExportsFromCloud(true);
     renderExports();
   });
 }
@@ -5838,7 +5928,13 @@ function renderExports() {
     ? "Endpoint configurado."
     : "Configure um endpoint para enviar os PDFs exportados para a nuvem.";
 
-  const rows = [...(state.exports || [])]
+  if (authState.mode === "supabase" && authState.user && !cloudSyncState.sharedExportsLoaded && !cloudSyncState.sharedExportsLoading) {
+    void loadSharedExportsFromCloud().then(() => {
+      renderExports();
+    });
+  }
+
+  const rows = [...getAllAvailableExports()]
     .sort((a, b) => new Date(b.exportedAt).getTime() - new Date(a.exportedAt).getTime())
     .map(
       (entry) => `
@@ -5847,6 +5943,7 @@ function renderExports() {
           <td>${formatDateTimeBR(entry.exportedAt)}</td>
           <td>${escapeHtml(entry.companyName || "-")}</td>
           <td>${escapeHtml(entry.proposalNumber || "-")}</td>
+          <td>${escapeHtml(entry.createdByEmail || "-")}</td>
           <td>${escapeHtml(cloudStatusLabel(entry.cloudStatus))}</td>
           <td>
             <div class="exports-actions">
@@ -5869,6 +5966,7 @@ function renderExports() {
             <th>Exportado em</th>
             <th>Cliente</th>
             <th>Nº Proposta</th>
+            <th>Criado por</th>
             <th>Status nuvem</th>
             <th>Ações</th>
           </tr>
@@ -6258,6 +6356,9 @@ function bindEvents() {
     cloudSyncState.saveTimer = null;
     cloudSyncState.hasLoadedFromCloud = false;
     cloudSyncState.pendingSave = false;
+    cloudSyncState.sharedExports = [];
+    cloudSyncState.sharedExportsLoaded = false;
+    cloudSyncState.sharedExportsLoading = false;
     if (authState.client) {
       try {
         await authState.client.auth.signOut();
@@ -8070,7 +8171,7 @@ function bindEvents() {
     const exportId = button.getAttribute("data-export-id");
     if (!exportId) return;
 
-    const exportRecord = (state.exports || []).find((entry) => entry.id === exportId);
+    const exportRecord = getAllAvailableExports().find((entry) => entry.id === exportId);
     if (!exportRecord) return;
 
     if (action === "edit-export") {
@@ -8084,13 +8185,19 @@ function bindEvents() {
         return;
       }
       exportRecord.cloudStatus = "pending";
+      const localIdx = state.exports.findIndex((entry) => entry.id === exportId);
+      if (localIdx >= 0) state.exports[localIdx].cloudStatus = "pending";
       saveState();
       renderExports();
       void syncExportToCloud(exportRecord).then((ok) => {
         const idx = state.exports.findIndex((entry) => entry.id === exportId);
-        if (idx < 0) return;
-        state.exports[idx].cloudStatus = ok ? "synced" : "failed";
+        if (idx >= 0) state.exports[idx].cloudStatus = ok ? "synced" : "failed";
         saveState();
+        renderExports();
+      });
+      void upsertSharedExportToCloud(exportRecord).then(async (ok) => {
+        if (!ok) return;
+        await loadSharedExportsFromCloud(true);
         renderExports();
       });
       return;
@@ -8099,7 +8206,9 @@ function bindEvents() {
     if (action === "delete-export") {
       if (!confirm("Deseja apagar este documento exportado do histórico?")) return;
       state.exports = (state.exports || []).filter((entry) => entry.id !== exportId);
+      cloudSyncState.sharedExports = (cloudSyncState.sharedExports || []).filter((entry) => entry.id !== exportId);
       saveState();
+      void deleteSharedExportFromCloud(exportId);
       void logAuditAction({
         action: "delete",
         module: "exports",

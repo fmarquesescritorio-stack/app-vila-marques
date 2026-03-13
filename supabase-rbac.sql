@@ -256,3 +256,103 @@ create policy app_user_state_delete_own
 on public.app_user_state
 for delete
 using (auth.uid() = user_id);
+
+-- =========================================================
+-- Exportados compartilhados entre usuários da empresa
+-- =========================================================
+
+create table if not exists public.app_shared_exports (
+  export_id text primary key,
+  type text not null check (type in ('proposal', 'payslip')),
+  exported_at timestamptz not null default now(),
+  proposal_number text,
+  company_name text,
+  snapshot jsonb not null default '{}'::jsonb,
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_app_shared_exports_exported_at on public.app_shared_exports(exported_at desc);
+create index if not exists idx_app_shared_exports_created_by on public.app_shared_exports(created_by);
+
+create or replace function public.touch_app_shared_exports_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_touch_app_shared_exports_updated_at on public.app_shared_exports;
+create trigger trg_touch_app_shared_exports_updated_at
+before update on public.app_shared_exports
+for each row
+execute procedure public.touch_app_shared_exports_updated_at();
+
+alter table public.app_shared_exports enable row level security;
+
+-- Usuários autenticados podem visualizar os exportados compartilhados.
+drop policy if exists app_shared_exports_select_authenticated on public.app_shared_exports;
+create policy app_shared_exports_select_authenticated
+on public.app_shared_exports
+for select
+using (auth.role() = 'authenticated');
+
+-- Quem criou pode inserir/atualizar/apagar seus registros.
+drop policy if exists app_shared_exports_insert_own on public.app_shared_exports;
+create policy app_shared_exports_insert_own
+on public.app_shared_exports
+for insert
+with check (auth.uid() = created_by);
+
+drop policy if exists app_shared_exports_update_own on public.app_shared_exports;
+create policy app_shared_exports_update_own
+on public.app_shared_exports
+for update
+using (auth.uid() = created_by)
+with check (auth.uid() = created_by);
+
+drop policy if exists app_shared_exports_delete_own on public.app_shared_exports;
+create policy app_shared_exports_delete_own
+on public.app_shared_exports
+for delete
+using (auth.uid() = created_by);
+
+-- Admin do app pode atualizar/apagar qualquer exportado compartilhado.
+drop policy if exists app_shared_exports_admin_update on public.app_shared_exports;
+create policy app_shared_exports_admin_update
+on public.app_shared_exports
+for update
+using (
+  exists (
+    select 1
+    from public.app_user_permissions p
+    where p.user_id = auth.uid()
+      and p.is_admin = true
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.app_user_permissions p
+    where p.user_id = auth.uid()
+      and p.is_admin = true
+  )
+);
+
+drop policy if exists app_shared_exports_admin_delete on public.app_shared_exports;
+create policy app_shared_exports_admin_delete
+on public.app_shared_exports
+for delete
+using (
+  exists (
+    select 1
+    from public.app_user_permissions p
+    where p.user_id = auth.uid()
+      and p.is_admin = true
+  )
+);
