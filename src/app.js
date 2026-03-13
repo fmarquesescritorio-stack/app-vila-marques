@@ -18,7 +18,7 @@ const LOCAL_TEST_USERNAME = "teste";
 const LOCAL_TEST_PASSWORD = "teste";
 const ALLOW_LOCAL_TEST_LOGIN = false;
 const ALLOW_PUBLIC_SIGNUP = false;
-const FIXED_LOGO_PATH = "/src/assets/logo-vila-marques.png";
+const FIXED_LOGO_PATH = "/assets/logo-vila-marques.png";
 const CONTRACTOR_INFO = {
   companyName: "Vila Marques Alojamentos",
   cnpj: "58.924.922/0001-75",
@@ -3071,7 +3071,8 @@ function printHtmlContent({ title, bodyClass = "", contentHtml }) {
   iframe.style.opacity = "0";
   iframe.style.pointerEvents = "none";
   document.body.appendChild(iframe);
-  const stylesHref = `${window.location.origin}/src/styles.css`;
+  const loadedStylesheetHref = document.getElementById("mainStylesheet")?.href;
+  const stylesHref = loadedStylesheetHref || `${window.location.origin}/styles.css`;
   const safeTitle = escapeHtml(title || "Documento");
   const safeBodyClass = String(bodyClass || "").trim();
   const printDocument = iframe.contentDocument;
