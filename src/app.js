@@ -3133,6 +3133,38 @@ async function ensureHtml2PdfBundle() {
   return Boolean(window.html2pdf);
 }
 
+function sanitizeFilenamePart(value, fallback = "sem-dado") {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return fallback;
+  return normalized;
+}
+
+function formatDateForFileName(isoDate) {
+  const value = String(isoDate || "").trim();
+  if (!value) {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const yyyy = String(now.getFullYear());
+    return `${dd}-${mm}-${yyyy}`;
+  }
+  const [yyyy, mm, dd] = value.split("-");
+  if (yyyy && mm && dd) return `${dd}-${mm}-${yyyy}`;
+  return sanitizeFilenamePart(value, "sem-data");
+}
+
+function formatMonthYearForFileName(isoDate) {
+  const value = String(isoDate || "").trim();
+  const [yyyy, mm] = value.split("-");
+  if (yyyy && mm) return `${mm}-${yyyy}`;
+  const now = new Date();
+  return `${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getFullYear())}`;
+}
+
 async function exportProposalAsPdfFile(proposalDocNode) {
   if (!proposalDocNode) return false;
   const hasLib = await ensureHtml2PdfBundle();
@@ -3140,12 +3172,14 @@ async function exportProposalAsPdfFile(proposalDocNode) {
   await waitForProposalRenderReady(proposalDocNode);
   proposalDocNode.classList.add("proposal-doc-pdf");
 
-  const proposalNumber = String(state.proposal?.proposalNumber || "").trim();
+  const companyName = sanitizeFilenamePart(state.company?.name || "Sem empresa", "Sem empresa");
   const issueDate = String(state.proposal?.issueDate || "").trim();
-  const dateSuffix = issueDate ? issueDate.replaceAll("-", "") : new Date().toISOString().slice(0, 10).replaceAll("-", "");
-  const filename = proposalNumber
-    ? `proposta-${proposalNumber}-${dateSuffix}.pdf`
-    : `proposta-comercial-${dateSuffix}.pdf`;
+  const monthYear = formatMonthYearForFileName(issueDate);
+  const contactName = sanitizeFilenamePart(
+    state.company?.contact || state.proposal?.recipient || "Sem contato",
+    "Sem contato",
+  );
+  const filename = `Proposta Comercial - ${companyName} - ${monthYear} - A C ${contactName}.pdf`;
 
   try {
     await window.html2pdf()
@@ -3181,15 +3215,9 @@ async function exportPayslipAsPdfFile(payslipSheetNode) {
 
   payslipSheetNode.classList.add("payslip-sheet-pdf");
   const paymentDate = String(state.payslip?.paymentDate || "").trim();
-  const dateSuffix = paymentDate
-    ? paymentDate.replaceAll("-", "")
-    : new Date().toISOString().slice(0, 10).replaceAll("-", "");
-  const employeeName = String(state.payslip?.employeeName || "funcionario")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "funcionario";
-  const filename = `contracheque-${employeeName}-${dateSuffix}.pdf`;
+  const employeeName = sanitizeFilenamePart(state.payslip?.employeeName || "Sem funcionario", "Sem funcionario");
+  const dateLabel = formatDateForFileName(paymentDate);
+  const filename = `Contracheque - ${employeeName} - ${dateLabel}.pdf`;
 
   try {
     await window.html2pdf()
