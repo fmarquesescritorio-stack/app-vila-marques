@@ -3,6 +3,9 @@
   "trailingSlash": false,
   "routes": [
     { "handle": "filesystem" },
+    { "src": "^/app\\.js$", "dest": "/app.js" },
+    { "src": "^/styles\\.css$", "dest": "/styles.css" },
+    { "src": "^/assets/(.*)$", "dest": "/assets/$1" },
     { "src": "^/$", "dest": "/index.html" },
     {
       "src": "^/(inicio|propostas|clientes|funcionarios|contracheque|balanco|impostos|contratos|imoveis-alugados|exportados)(?:/.*)?$",
