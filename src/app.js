@@ -168,6 +168,7 @@ const cloudSyncState = {
   sharedExports: [],
   sharedExportsLoaded: false,
   sharedExportsLoading: false,
+  sharedExportsLastSyncAt: 0,
 };
 
 const DEFAULT_APP_PERMISSIONS = {
@@ -1774,9 +1775,11 @@ async function loadSharedExportsFromCloud(force = false) {
       createdByEmail: entry.created_by_email,
     }));
     cloudSyncState.sharedExportsLoaded = true;
+    cloudSyncState.sharedExportsLastSyncAt = Date.now();
   } catch {
     cloudSyncState.sharedExports = [];
     cloudSyncState.sharedExportsLoaded = false;
+    cloudSyncState.sharedExportsLastSyncAt = 0;
   } finally {
     cloudSyncState.sharedExportsLoading = false;
   }
@@ -2078,6 +2081,11 @@ function setActiveTab(tabName) {
   uiState.notificationsOpen = false;
   setModulesMenuOpen(false);
   applyPermissionsUi();
+  if (uiState.activeTab === "exports" && authState.mode === "supabase" && authState.user) {
+    void loadSharedExportsFromCloud(true).then(() => {
+      renderExports();
+    });
+  }
 }
 
 function setProposalStep(nextStep) {
@@ -3006,9 +3014,15 @@ async function exportProposalAsPdfFile(proposalDocNode) {
         margin: [12, 10, 14, 10],
         filename,
         image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          windowWidth: 1440,
+          scrollX: 0,
+          scrollY: 0,
+        },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        pagebreak: { mode: ["css"] },
       })
       .from(proposalDocNode)
       .save();
@@ -5925,8 +5939,15 @@ function renderExports() {
     ? "Endpoint configurado."
     : "Configure um endpoint para enviar os PDFs exportados para a nuvem.";
 
-  if (authState.mode === "supabase" && authState.user && !cloudSyncState.sharedExportsLoaded && !cloudSyncState.sharedExportsLoading) {
-    void loadSharedExportsFromCloud().then(() => {
+  const shouldRefreshSharedExports = authState.mode === "supabase"
+    && authState.user
+    && !cloudSyncState.sharedExportsLoading
+    && (
+      !cloudSyncState.sharedExportsLoaded
+      || (Date.now() - Number(cloudSyncState.sharedExportsLastSyncAt || 0)) > 15000
+    );
+  if (shouldRefreshSharedExports) {
+    void loadSharedExportsFromCloud(true).then(() => {
       renderExports();
     });
   }
@@ -6356,6 +6377,7 @@ function bindEvents() {
     cloudSyncState.sharedExports = [];
     cloudSyncState.sharedExportsLoaded = false;
     cloudSyncState.sharedExportsLoading = false;
+    cloudSyncState.sharedExportsLastSyncAt = 0;
     if (authState.client) {
       try {
         await authState.client.auth.signOut();

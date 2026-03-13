@@ -673,6 +673,21 @@ input:focus, select:focus, textarea:focus {
   line-height: 1.45;
 }
 
+.proposal-doc.proposal-doc-pdf .doc-section,
+.proposal-doc.proposal-doc-pdf .doc-table,
+.proposal-doc.proposal-doc-pdf .doc-table tr,
+.proposal-doc.proposal-doc-pdf .doc-numbered-list,
+.proposal-doc.proposal-doc-pdf .doc-numbered-list li,
+.proposal-doc.proposal-doc-pdf .doc-footer {
+  break-inside: auto !important;
+  page-break-inside: auto !important;
+}
+
+.proposal-doc.proposal-doc-pdf .doc-section h4 {
+  break-after: avoid-page !important;
+  page-break-after: avoid !important;
+}
+
 .doc-header {
   display: flex;
   justify-content: space-between;
