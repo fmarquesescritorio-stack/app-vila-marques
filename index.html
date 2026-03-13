@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vila Marques Alojamentos - App Comercial</title>
+    <link id="mainStylesheet" rel="stylesheet" href="/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  </head>
+  <body>
+    <section id="authGate" class="auth-gate">
+      <div class="auth-card">
+        <img class="auth-logo" src="/assets/logo-vila-marques.png" alt="Vila Marques Alojamentos" />
+        <h2>Acesso ao Sistema</h2>
+        <p class="small">Entre com seu usuário para acessar propostas, contracheques e balanço.</p>
+        <form id="authConfigForm" class="form-grid auth-hidden">
+          <label class="full">URL do servidor<input id="supabaseUrlInput" placeholder="https://seu-servidor.com" /></label>
+          <label class="full">Chave pública de acesso<input id="supabaseAnonKeyInput" placeholder="Cole a chave pública aqui" /></label>
+          <div class="full row-end">
+            <button class="btn" type="submit">Salvar configuração</button>
+          </div>
+        </form>
+
+        <form id="loginForm" class="form-grid auth-step">
+          <label class="full">Usuário ou e-mail<input name="email" type="text" required /></label>
+          <label class="full">Senha<input name="password" type="password" required /></label>
+          <div class="full row-end"><button class="btn btn-primary" type="submit">Entrar</button></div>
+        </form>
+
+        <form id="signupForm" class="form-grid auth-hidden">
+          <label class="full">E-mail<input name="email" type="email" required /></label>
+          <label class="full">Senha<input name="password" type="password" minlength="6" required /></label>
+          <div class="full row-end"><button class="btn btn-primary" type="submit">Criar conta</button></div>
+        </form>
+
+        <form id="forgotForm" class="form-grid auth-hidden">
+          <label class="full">E-mail<input name="email" type="email" required /></label>
+          <div class="full row-end"><button class="btn btn-primary" type="submit">Enviar recuperação</button></div>
+        </form>
+
+        <form id="resetForm" class="form-grid auth-hidden">
+          <label class="full">Nova senha<input name="password" type="password" minlength="6" required /></label>
+          <div class="full row-end"><button class="btn btn-primary" type="submit">Atualizar senha</button></div>
+        </form>
+
+        <div id="authMessage" class="small"></div>
+      </div>
+    </section>
+
+    <div id="appShell" class="app-shell-hidden">
+    <header class="topbar">
+      <div class="topbar-brand">
+        <img class="topbar-logo" src="/assets/logo-vila-marques.png" alt="Vila Marques Alojamentos" />
+        <div id="userWelcome" class="topbar-welcome">Bem-vindo(a)</div>
+      </div>
+      <div class="topbar-actions">
+        <span id="userRoleBadge" class="role-badge role-badge-employee">Funcionário</span>
+        <div class="notifications-wrap">
+          <button id="btnNotifications" class="btn notifications-btn" type="button" aria-label="Notificações" title="Notificações">
+            &#128276;
+            <span id="notificationsBadge" class="notifications-badge auth-hidden">0</span>
+          </button>
+          <div id="notificationsPanel" class="notifications-panel auth-hidden"></div>
+        </div>
+      </div>
+    </header>
+    <section class="announcement-bar" aria-label="Informações gerais">
+      <div class="announcement-inner">
+        <button id="btnModulesToggle" class="menu-icon-btn" type="button" aria-label="Abrir módulos" title="Módulos">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="modules-dropdown">
+          <div id="modulesMenu" class="modules-menu modules-menu-hidden" aria-label="Módulos do aplicativo">
+            <button id="tabHome" class="tab-btn tab-btn-active" type="button" data-tab="home">Início</button>
+            <button id="tabProposals" class="tab-btn" type="button" data-tab="proposals">Propostas Comerciais</button>
+            <button id="tabClients" class="tab-btn" type="button" data-tab="clients">Clientes</button>
+            <button id="tabEmployees" class="tab-btn" type="button" data-tab="employees">Funcionários</button>
+            <button id="tabPayslip" class="tab-btn" type="button" data-tab="payslip">Contracheque</button>
+            <button id="tabBalance" class="tab-btn" type="button" data-tab="balance">Balanço</button>
+            <button id="tabTaxes" class="tab-btn" type="button" data-tab="taxes">Impostos</button>
+            <button id="tabContracts" class="tab-btn" type="button" data-tab="contracts">Contratos</button>
+            <button id="tabRentedProperties" class="tab-btn" type="button" data-tab="rentedProperties">Imóveis Alugados</button>
+            <button id="tabExports" class="tab-btn" type="button" data-tab="exports">Exportados</button>
+          </div>
+        </div>
+        <div class="announcement-content">
+          <strong>Vila Marques Alojamentos</strong> | CNPJ 58.924.922/0001-75 | Telefone: (31) 99578-5160
+        </div>
+      </div>
+    </section>
+    <section class="header-actions-strip" aria-label="Ações rápidas">
+      <div class="header-actions-inner">
+        <button id="btnExportPdf" class="btn btn-primary header-export-btn">Exportar proposta em PDF</button>
+        <button id="btnExportPayslipPdf" class="btn btn-primary header-export-btn">Exportar contracheque A4</button>
+      </div>
+    </section>
+
+    <main class="layout">
+      <section id="homeModule" class="module module-active">
+        <section class="panel home-dashboard-panel">
+          <h2 id="homeGreeting" class="home-greeting">Olá, o que você precisa fazer agora?</h2>
+          <div id="homeModulesGrid" class="home-modules-grid"></div>
+        </section>
+      </section>
+
+      <section id="proposalModule" class="module">
+        <section id="proposalEntryGate" class="panel">
+          <h2>Iniciar proposta comercial</h2>
+          <div class="form-grid">
+            <label class="full">Selecionar cliente cadastrado
+              <select id="proposalEntryClientSelect">
+                <option value="">Selecionar cliente salvo</option>
+              </select>
+            </label>
+            <div class="full row-end">
+              <button id="btnStartProposalWithClient" type="button" class="btn">Usar cliente para criar proposta</button>
+            </div>
+            <div class="full row-end">
+              <button id="btnStartProposalWithoutClient" type="button" class="btn btn-primary">Prosseguir sem cliente</button>
+            </div>
+          </div>
+        </section>
+
+        <div id="proposalWorkflow" class="auth-hidden">
+          <div class="stepper-panel">
+            <div class="stepper-track" id="proposalStepIndicators">
+              <button type="button" class="step-chip step-chip-active" data-step-jump="1">1. Empresa</button>
+              <button type="button" class="step-chip" data-step-jump="2">2. Imóvel</button>
+              <button type="button" class="step-chip" data-step-jump="3">3. Mobília</button>
+              <button type="button" class="step-chip" data-step-jump="4">4. Condição</button>
+              <button type="button" class="step-chip" data-step-jump="5">5. Dados</button>
+              <button type="button" class="step-chip" data-step-jump="6">6. Documento</button>
+            </div>
+          </div>
+
+          <section class="panel proposal-step proposal-step-active" data-step="1">
+          <h2>1) Empresa</h2>
+          <form id="companyForm" class="form-grid">
+            <label class="full">Cliente cadastrado
+              <select id="proposalClientSelect">
+                <option value="">Selecionar cliente salvo</option>
+              </select>
+            </label>
+            <div class="full row-end">
+              <button id="btnUseSelectedClientInProposal" type="button" class="btn">Usar cliente na proposta</button>
+            </div>
+            <label>Nome da empresa<input name="name" required /></label>
+            <label>CNPJ<input name="cnpj" inputmode="numeric" maxlength="18" placeholder="00.000.000/0000-00" /></label>
+            <label>Contato<input name="contact" /></label>
+            <label>Celular<input name="phone" inputmode="numeric" maxlength="15" placeholder="(00) 00000-0000" /></label>
+            <label>E-mail<input type="email" name="email" placeholder="contato@empresa.com.br" /></label>
+            <label>Cidade<input name="city" /></label>
+            <label class="full">Observações<textarea name="notes" rows="3"></textarea></label>
+            <div class="full row-end">
+              <button class="btn">Salvar empresa</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel proposal-step" data-step="2">
+          <h2>2) Imóvel</h2>
+          <form id="propertyForm" class="form-grid">
+            <label>Nome do imóvel<input name="name" required /></label>
+            <label>Tipo
+              <select name="type">
+                <option value="Apartamento">Apartamento</option>
+                <option value="Casa">Casa</option>
+                <option value="Studio">Studio</option>
+              </select>
+            </label>
+            <label>Classificação
+              <select name="operationType">
+                <option value="Administrativo">Administrativo</option>
+                <option value="Operacional">Operacional</option>
+                <option value="Gerencial">Gerencial</option>
+              </select>
+            </label>
+            <label>Rua<input name="street" /></label>
+            <label>Número<input name="number" /></label>
+            <label>Complemento<input name="complement" /></label>
+            <label>Bairro<input name="district" /></label>
+            <label>Cidade<input name="city" /></label>
+            <label>Estado (UF)<input name="state" maxlength="2" placeholder="Ex.: MG" /></label>
+            <label>CEP<input name="zipCode" inputmode="numeric" maxlength="9" placeholder="00000-000" /></label>
+            <label>Capacidade (pessoas)<input name="capacity" type="number" min="1" value="1" /></label>
+            <label>Quantidade de quartos<input name="bedrooms" type="number" min="0" value="0" /></label>
+            <label>Quantidade de banheiros<input name="bathrooms" type="number" min="0" value="0" /></label>
+            <label>Quantidade de garagem<input name="garageSpots" type="number" min="0" value="0" /></label>
+            <label>Área de serviço
+              <select name="serviceAreaType">
+                <option value="">Selecione</option>
+                <option value="Coberta">Coberta</option>
+                <option value="Descoberta">Descoberta</option>
+              </select>
+            </label>
+            <label>Diária por pessoa (R$)<input name="dailyRatePerPerson" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+            <label class="full">Descrição<textarea name="description" rows="3"></textarea></label>
+            <div class="full row-end">
+              <button class="btn">Salvar imóvel</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel proposal-step" data-step="3">
+          <h2>3) Mobília</h2>
+          <p class="small">Selecione itens padrão para inclusão opcional:</p>
+          <div id="defaultFurnitureOptions" class="checklist"></div>
+          <div class="row-end">
+            <button id="btnAddSelectedFurniture" type="button" class="btn">Adicionar itens selecionados</button>
+          </div>
+          <hr />
+          <form id="furnitureForm" class="inline-form">
+            <input name="item" placeholder="Item de mobília" required />
+            <input name="environment" placeholder="Ambiente (Ex.: Cozinha)" required />
+            <input name="quantity" type="number" min="1" value="1" required />
+            <input name="notes" placeholder="Observações (opcional)" />
+            <button class="btn">Adicionar</button>
+          </form>
+          <ul id="furnitureList" class="list"></ul>
+        </section>
+
+        <section class="panel proposal-step" data-step="4">
+          <h2>4) Condição Comercial</h2>
+          <form id="pricingForm" class="form-grid">
+            <label>Margem comercial (%)<input name="marginPercent" type="number" min="0" step="0.01" value="0" /></label>
+            <label>Taxa administrativa (%)<input name="adminFeePercent" type="number" min="0" step="0.01" value="0" /></label>
+            <label>Desconto (%)<input name="discount" type="number" min="0" max="100" value="0" /></label>
+            <label>Validade da proposta<input name="validUntil" type="date" /></label>
+            <div class="full row-end">
+              <button class="btn">Salvar condição</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel proposal-step" data-step="5">
+          <h2>5) Dados da Proposta</h2>
+          <form id="proposalForm" class="form-grid">
+            <label>Número da proposta<input name="proposalNumber" placeholder="Ex.: VM-2026-001" /></label>
+            <label>Data de emissão<input name="issueDate" type="date" /></label>
+            <label>Vigência inicial<input name="contractStartDate" type="date" /></label>
+            <label>Vigência final<input name="contractEndDate" type="date" /></label>
+            <label>Dia de pagamento<input name="paymentDay" type="number" min="1" max="31" placeholder="Ex.: 10" /></label>
+            <label>Destinatário<input name="recipient" placeholder="Ex.: Gerência de RH" /></label>
+            <div class="full row-end">
+              <button class="btn">Salvar dados da proposta</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel proposal proposal-step" id="proposalArea" data-step="6">
+          <h2>6) Proposta Gerada (Documento Final)</h2>
+          <div class="proposal-photo-upload">
+            <h3>Anexos Fotográficos do Imóvel</h3>
+            <div class="photo-actions">
+              <input id="proposalPhotosInput" type="file" accept="image/*" multiple class="photo-input-hidden" />
+              <input id="proposalPhotosCameraInput" type="file" accept="image/*" capture="environment" class="photo-input-hidden" />
+              <button id="btnSelectPhotos" class="btn" type="button">Adicionar da galeria</button>
+              <button id="btnTakePhoto" class="btn" type="button">Tirar foto agora</button>
+            </div>
+            <ul id="proposalPhotosList" class="list"></ul>
+          </div>
+          <div id="proposalOutput"></div>
+        </section>
+
+        <div class="step-actions">
+          <button id="btnPrevStep" type="button" class="btn">Etapa anterior</button>
+          <button id="btnNextStep" type="button" class="btn btn-primary">Próxima etapa</button>
+        </div>
+        </div>
+      </section>
+
+      <section id="clientsModule" class="module">
+        <section class="panel">
+          <h2>Cadastro de Clientes</h2>
+          <div class="balance-controls">
+            <div class="balance-mode-switch">
+              <button id="btnNewClient" type="button" class="btn">Novo cliente</button>
+            </div>
+          </div>
+          <div id="clientsFormContainer" class="panel auth-hidden" style="margin-bottom: 12px;">
+            <div class="balance-mode-switch" style="margin-bottom: 8px;">
+              <button id="btnBackToClientsList" type="button" class="btn">Voltar para Clientes</button>
+            </div>
+            <form id="clientCatalogForm" class="form-grid">
+              <label>Nome / Razão social<input name="clientName" required /></label>
+              <label>CNPJ<input name="clientCnpj" inputmode="numeric" maxlength="18" placeholder="00.000.000/0000-00" /></label>
+              <label>Contato responsável<input name="clientContact" /></label>
+              <label>Celular<input name="clientPhone" inputmode="numeric" maxlength="15" placeholder="(00) 00000-0000" /></label>
+              <label>E-mail<input name="clientEmail" type="email" placeholder="contato@empresa.com" /></label>
+              <label>Rua<input name="clientStreet" /></label>
+              <label>Número<input name="clientNumber" /></label>
+              <label>Complemento<input name="clientComplement" /></label>
+              <label>Bairro<input name="clientDistrict" /></label>
+              <label>Cidade<input name="clientCity" /></label>
+              <label>Estado (UF)<input name="clientState" maxlength="2" placeholder="Ex.: MG" /></label>
+              <label>CEP<input name="clientZipCode" inputmode="numeric" maxlength="9" placeholder="00000-000" /></label>
+              <label class="full">Observações<textarea name="clientNotes" rows="3"></textarea></label>
+              <div class="full row-end">
+                <button class="btn" type="submit">Salvar cliente</button>
+              </div>
+            </form>
+          </div>
+          <div id="clientsViewContainer" class="panel auth-hidden" style="margin-bottom: 12px;">
+            <div class="balance-mode-switch" style="margin-bottom: 8px;">
+              <button id="btnBackFromClientView" type="button" class="btn">Voltar para Clientes</button>
+            </div>
+            <div id="clientDetailsContent"></div>
+          </div>
+          <div id="clientCatalogList" class="balance-monthly"></div>
+        </section>
+      </section>
+
+      <section id="employeesModule" class="module">
+        <section class="panel">
+          <h2>Cadastro de Funcionários</h2>
+          <div class="balance-controls">
+            <div class="balance-mode-switch">
+              <button id="btnNewEmployee" type="button" class="btn">Novo funcionário</button>
+              <button id="btnExportEmployeesCsv" type="button" class="btn">Exportar lista (CSV)</button>
+            </div>
+          </div>
+          <div id="employeesFormContainer" class="panel auth-hidden" style="margin-bottom: 12px;">
+            <div class="balance-mode-switch" style="margin-bottom: 8px;">
+              <button id="btnBackToEmployeesList" type="button" class="btn">Voltar para Funcionários</button>
+            </div>
+            <form id="employeeCatalogForm" class="form-grid">
+              <label>Nome do funcionário<input name="employeeName" required /></label>
+              <label>CPF<input name="employeeCpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" required /></label>
+              <label>Cargo<input name="position" /></label>
+              <label>Matrícula<input name="registration" /></label>
+              <label>Salário base (R$)<input name="baseSalary" data-brl inputmode="numeric" value="R$ 0,00" /></label>
+              <label>Vale alimentação fixo (R$)<input name="mealAllowanceFixed" data-brl inputmode="numeric" value="R$ 0,00" /></label>
+              <label>Vale alimentação diário (R$)<input name="mealAllowanceDaily" data-brl inputmode="numeric" value="R$ 0,00" /></label>
+              <label>Descontos fixos (%)<input name="fixedDiscountPercent" type="number" min="0" step="0.01" value="0" /></label>
+              <label class="full">Anexar documentos do funcionário
+                <input id="employeeDocsInput" type="file" multiple />
+              </label>
+              <div class="full">
+                <ul id="employeePendingDocsList" class="list"></ul>
+              </div>
+              <div class="full row-end">
+                <button class="btn" type="submit">Salvar funcionário</button>
+              </div>
+            </form>
+          </div>
+          <div id="employeesViewContainer" class="panel auth-hidden" style="margin-bottom: 12px;">
+            <div class="balance-mode-switch" style="margin-bottom: 8px;">
+              <button id="btnBackFromEmployeeView" type="button" class="btn">Voltar para Funcionários</button>
+            </div>
+            <div id="employeeDetailsContent"></div>
+          </div>
+          <div id="employeeCatalogList" class="balance-monthly"></div>
+        </section>
+      </section>
+
+      <section id="payslipModule" class="module">
+        <section class="panel payslip-builder">
+          <h2>Contracheque</h2>
+          <div class="balance-controls">
+            <div class="balance-mode-switch">
+              <button id="btnNewPayslip" type="button" class="btn">Novo contracheque</button>
+            </div>
+          </div>
+          <div id="payslipFormContainer" class="panel auth-hidden" style="margin-bottom: 12px;">
+            <div class="balance-mode-switch" style="margin-bottom: 8px;">
+              <button id="btnBackToPayslipList" type="button" class="btn">Voltar para Contracheques</button>
+            </div>
+            <div class="payslip-employee-bar">
+              <button id="btnOpenEmployeesTab" type="button" class="btn">Cadastrar funcionário</button>
+              <label>Funcionário salvo
+                <select id="savedPayslipEmployeeSelect">
+                  <option value="">Selecionar funcionário salvo</option>
+                </select>
+              </label>
+            </div>
+            <form id="payslipForm" class="form-grid">
+              <label>Competência (automática)<input name="competence" placeholder="MM/AAAA" required readonly /></label>
+              <label>Mês de referência<input name="referenceMonth" type="month" required /></label>
+              <label>Data de pagamento<input name="paymentDate" type="date" required /></label>
+              <label>Forma de pagamento
+                <select name="paymentMethod" required>
+                  <option value="">Selecione</option>
+                  <option value="PIX">PIX</option>
+                  <option value="Transferência bancária">Transferência bancária</option>
+                  <option value="Em espécie">Em espécie</option>
+                </select>
+              </label>
+              <label>Nome do funcionário<input name="employeeName" required /></label>
+              <label>CPF<input name="employeeCpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" required /></label>
+              <label>Cargo<input name="position" required /></label>
+              <label>Matrícula<input name="registration" required /></label>
+              <label>Salário base (R$)<input name="baseSalary" data-brl inputmode="numeric" value="R$ 0,00" required /></label>
+              <label>Dias totais do mês (automático)<input name="monthTotalDays" type="number" min="28" max="31" value="30" required readonly /></label>
+              <label>Primeira data trabalhada no mês<input name="firstWorkDayInMonth" type="date" required /></label>
+              <label>Última data trabalhada no mês<input name="lastWorkDayInMonth" type="date" required /></label>
+              <label>Dias úteis do período (automático)<input name="businessDaysInMonth" type="number" min="0" max="31" value="22" required readonly /></label>
+              <label>Dias de falta<input name="absenceDays" type="number" min="0" max="31" value="0" required /></label>
+              <label>Dias de abono<input name="allowanceDays" type="number" min="0" max="31" value="0" required /></label>
+              <div class="full row-end">
+                <button class="btn">Salvar dados do contracheque</button>
+              </div>
+            </form>
+
+            <div class="payslip-input-grid">
+              <div>
+                <h3>Proventos</h3>
+                <form id="earningForm" class="inline-form-3">
+                  <input name="description" placeholder="Descrição" required />
+                  <input name="value" data-brl inputmode="numeric" value="R$ 0,00" required />
+                  <button class="btn">Adicionar</button>
+                </form>
+                <ul id="earningList" class="list"></ul>
+              </div>
+              <div>
+                <h3>Descontos</h3>
+                <form id="discountForm" class="inline-form-3">
+                  <input name="description" placeholder="Descrição" required />
+                  <input name="value" data-brl inputmode="numeric" value="R$ 0,00" required />
+                  <button class="btn">Adicionar</button>
+                </form>
+                <ul id="discountList" class="list"></ul>
+              </div>
+            </div>
+          </div>
+          <div id="payslipOutput" class="payslip-output"></div>
+        </section>
+      </section>
+
+      <section id="balanceModule" class="module">
+        <section class="panel balance-builder">
+          <h2>Balanço Mensal</h2>
+          <div class="balance-controls">
+            <div class="balance-mode-switch">
+              <button id="btnBalanceMonthly" type="button" class="btn btn-primary">Visão Mensal</button>
+              <button id="btnBalanceYearly" type="button" class="btn">Panorama Anual</button>
+            </div>
+            <div class="balance-filters">
+              <label>Ano
+                <select id="balanceYearSelect"></select>
+              </label>
+              <label id="balanceMonthFilter">Mês
+                <select id="balanceMonthSelect">
+                  <option value="1">Janeiro</option>
+                  <option value="2">Fevereiro</option>
+                  <option value="3">Março</option>
+                  <option value="4">Abril</option>
+                  <option value="5">Maio</option>
+                  <option value="6">Junho</option>
+                  <option value="7">Julho</option>
+                  <option value="8">Agosto</option>
+                  <option value="9">Setembro</option>
+                  <option value="10">Outubro</option>
+                  <option value="11">Novembro</option>
+                  <option value="12">Dezembro</option>
+                </select>
+              </label>
+              <label>Contrato
+                <select id="balanceContractSelect">
+                  <option value="">Geral (todos)</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <section class="balance-entry-layout" aria-label="Lançamentos do balanço">
+            <article class="balance-entry-panel">
+              <header class="balance-entry-header">
+                <span class="balance-entry-step">1</span>
+                <div>
+                  <h3>Lançar Entrada</h3>
+                  <p class="small">Registre recebimentos do período com data e valor.</p>
+                </div>
+              </header>
+              <form id="incomeForm" class="form-grid balance-form-stack">
+                <label class="full">Descrição da entrada
+                  <input name="description" placeholder="Ex.: Recebimento contrato Casa Operacional A" required />
+                </label>
+                <label>Valor (R$)
+                  <input name="amount" data-brl inputmode="numeric" value="R$ 0,00" required />
+                </label>
+                <label>Data e hora
+                  <input name="dateTime" type="datetime-local" required />
+                </label>
+                <div class="full row-end">
+                  <button class="btn">Adicionar entrada</button>
+                </div>
+              </form>
+            </article>
+
+            <article class="balance-entry-panel">
+              <header class="balance-entry-header">
+                <span class="balance-entry-step">2</span>
+                <div>
+                  <h3>Lançar Despesa</h3>
+                  <p class="small">Selecione a categoria para liberar os campos necessários.</p>
+                </div>
+              </header>
+              <form id="expenseForm" class="form-grid balance-form-stack">
+                <label>Categoria
+                  <select name="category" id="expenseCategorySelect" required>
+                    <option value="">Selecione</option>
+                    <option value="combustivel">Combustível</option>
+                    <option value="pedagios">Pedágios</option>
+                    <option value="alimentacao">Alimentação</option>
+                    <option value="aluguel">Aluguel</option>
+                    <option value="salario">Salário</option>
+                    <option value="manutencao">Manutenção</option>
+                    <option value="impostos">Impostos</option>
+                    <option value="agua">Água</option>
+                    <option value="luz">Luz</option>
+                    <option value="internet">Internet</option>
+                    <option value="outros">Outros</option>
+                  </select>
+                </label>
+                <label>Valor (R$)
+                  <input name="amount" data-brl inputmode="numeric" value="R$ 0,00" required />
+                </label>
+                <label>Data e hora
+                  <input name="dateTime" type="datetime-local" required />
+                </label>
+                <label>Responsável pela despesa
+                  <input name="responsible" placeholder="Ex.: Fred Marques" required />
+                </label>
+                <label id="expenseContractRow" class="auth-hidden">Contrato (obrigatório para aluguel, manutenção, água, luz e internet)
+                  <select name="contractId" id="expenseContractSelect">
+                    <option value="">Sem contrato (geral)</option>
+                  </select>
+                </label>
+                <label id="expenseEmployeeRow" class="auth-hidden">Funcionário (obrigatório para salário)
+                  <select name="employeeId" id="expenseEmployeeSelect">
+                    <option value="">Selecionar funcionário</option>
+                  </select>
+                </label>
+                <label id="expenseMaintenanceRow" class="auth-hidden">Especificar manutenção
+                  <input name="maintenanceDetails" placeholder="Ex.: troca de chuveiro, pintura, hidráulica" />
+                </label>
+                <label class="full">Observações (opcional)
+                  <input name="details" placeholder="Detalhes complementares" />
+                </label>
+                <div class="full row-end">
+                  <button class="btn">Adicionar despesa</button>
+                </div>
+              </form>
+            </article>
+
+            <article class="balance-entry-panel">
+              <header class="balance-entry-header">
+                <span class="balance-entry-step">3</span>
+                <div>
+                  <h3>Pagamento Mensal de Salário</h3>
+                  <p class="small">Cálculo automático com base no cadastro do funcionário e regras do contracheque.</p>
+                </div>
+              </header>
+              <form id="salaryPaymentForm" class="form-grid balance-form-stack">
+              <label>Funcionário
+                <select name="employeeId" id="salaryPaymentEmployeeSelect" required>
+                  <option value="">Selecionar funcionário</option>
+                </select>
+              </label>
+              <label>Mês de referência
+                <input name="referenceMonth" type="month" required />
+              </label>
+              <label>Data de pagamento
+                <input name="paymentDateISO" type="date" required />
+              </label>
+                <label>Dias do mês (automático)
+                  <input name="monthTotalDays" type="number" min="28" max="31" required readonly />
+                </label>
+                <label>Primeira data trabalhada
+                  <input name="firstWorkDayInMonth" type="date" required />
+                </label>
+                <label>Última data trabalhada
+                  <input name="lastWorkDayInMonth" type="date" required />
+                </label>
+                <label>Dias úteis no período (automático)
+                  <input name="businessDaysInMonth" type="number" min="0" required readonly />
+                </label>
+                <label>Faltas
+                  <input name="absenceDays" type="number" min="0" value="0" required />
+                </label>
+                <label class="full">Justificativa das faltas
+                  <input name="absenceJustification" placeholder="Obrigatório quando houver faltas" />
+                </label>
+                <label>Abonos
+                  <input name="allowanceDays" type="number" min="0" value="0" required />
+                </label>
+                <label class="full">Justificativa dos abonos
+                  <input name="allowanceJustification" placeholder="Obrigatório quando houver abonos" />
+                </label>
+                <div id="salaryPaymentPreview" class="full small"></div>
+                <div class="full row-end">
+                  <button class="btn btn-primary" type="submit">Registrar pagamento salarial</button>
+                </div>
+              </form>
+            </article>
+          </section>
+
+          <section class="panel balance-import-panel">
+            <header class="balance-entry-header">
+              <span class="balance-entry-step">4</span>
+              <div>
+                <h3>Importar despesas em lote</h3>
+                <p class="small">Uma despesa por linha no formato: <code>descrição;valor;data-hora(AAAA-MM-DDTHH:mm);responsável;contrato(opcional)</code></p>
+              </div>
+            </header>
+            <form id="expenseBatchForm" class="form-grid balance-form-stack">
+              <label class="full">Despesas
+                <textarea name="batchText" rows="5" placeholder="Combustível;350,90;2026-03-10T08:30;Fred Marques"></textarea>
+              </label>
+              <div class="full row-end">
+                <button class="btn" type="submit">Importar despesas</button>
+              </div>
+            </form>
+          </section>
+
+          <div id="balanceSummary" class="balance-summary"></div>
+          <div id="balanceContractSummary" class="balance-monthly"></div>
+          <div id="balanceByResponsible" class="balance-monthly"></div>
+          <div id="balanceMonthly" class="balance-monthly"></div>
+          <div id="balanceForecast" class="balance-monthly"></div>
+        </section>
+      </section>
+
+      <section id="exportsModule" class="module">
+        <section class="panel exports-panel">
+          <h2>Documentos Exportados</h2>
+          <form id="cloudSyncForm" class="inline-form-3">
+            <input id="cloudSyncEndpoint" placeholder="URL de sincronização na nuvem (webhook/API)" />
+            <button class="btn">Salvar endpoint</button>
+          </form>
+          <p class="small">A sincronização na nuvem ocorre somente no momento da exportação em PDF.</p>
+          <div id="cloudSyncStatus" class="small"></div>
+
+          <div id="exportsList"></div>
+        </section>
+      </section>
+
+      <section id="taxesModule" class="module">
+        <section class="panel">
+          <h2>Impostos</h2>
+          <p class="small">Informe mensalmente o faturamento bruto e o valor pago em impostos para cálculo automático da alíquota.</p>
+          <form id="taxesForm" class="form-grid">
+            <label>Mês de referência
+              <input name="referenceMonth" type="month" required />
+            </label>
+            <label>Data de pagamento (opcional)
+              <input name="paymentDateISO" type="date" />
+            </label>
+            <label>Faturamento bruto mensal (R$)
+              <input name="grossRevenue" data-brl inputmode="numeric" value="R$ 0,00" required />
+            </label>
+            <label>Impostos pagos no mês (R$)
+              <input name="taxPaid" data-brl inputmode="numeric" value="R$ 0,00" required />
+            </label>
+            <label class="full">Observações
+              <input name="notes" placeholder="Ex.: DAS + ISS do mês" />
+            </label>
+            <div id="taxesRatePreview" class="full small"></div>
+            <div class="full row-end">
+              <button id="btnSaveTaxRecord" class="btn btn-primary" type="submit">Salvar imposto mensal</button>
+            </div>
+          </form>
+          <div id="taxesList" class="balance-monthly"></div>
+        </section>
+      </section>
+
+      <section id="contractsModule" class="module">
+        <section class="panel">
+          <h2>Contratos</h2>
+          <div id="contractsTopActions" class="balance-controls">
+            <div class="balance-mode-switch">
+              <button id="btnNewContract" type="button" class="btn">Novo contrato</button>
+              <button id="btnOpenContractSimulation" type="button" class="btn">Simular contrato</button>
+              <button id="btnSaveContractDraft" type="button" class="btn">Salvar rascunho</button>
+              <button id="btnSaveContract" type="button" class="btn btn-primary">Salvar contrato</button>
+            </div>
+          </div>
+          <div id="contractsSimulationPanel" class="panel auth-hidden" style="margin-bottom: 12px;">
+            <div class="balance-controls" style="margin-bottom: 8px;">
+              <strong>Simulação de Contrato (temporária)</strong>
+              <div class="balance-mode-switch">
+                <button id="btnClearContractSimulation" type="button" class="btn">Limpar simulação</button>
+                <button id="btnCloseContractSimulation" type="button" class="btn">Fechar simulação</button>
+              </div>
+            </div>
+            <form id="contractsSimulationForm" class="form-grid">
+              <label>Capacidade de pessoas<input name="capacity" type="number" min="1" value="0" /></label>
+              <label>Imposto mensal sobre faturamento (%)<input name="monthlyTaxPercent" type="number" min="0" step="0.01" value="0" /></label>
+              <label>Lucro alvo mensal (R$)<input name="targetMonthlyProfit" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Diária por pessoa para testar (R$)<input name="dailyRatePerPerson" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Aluguel (R$)<input name="rentCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Funcionário (R$)<input name="staffCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Mobília (R$) - custo único<input name="furnitureCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Produtos de limpeza (R$)<input name="cleaningProductsCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Água (R$)<input name="waterCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Luz (R$)<input name="electricityCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Internet (R$)<input name="internetCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Manutenções (R$)<input name="maintenanceCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Pró-labore (R$)<input name="proLaboreCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+            </form>
+            <div id="contractsSimulationResult" class="balance-summary" style="margin-top: 10px;"></div>
+          </div>
+          <div id="contractsFormContainer" class="panel auth-hidden" style="margin-bottom: 12px;">
+            <h3 style="margin-top: 0;">Preenchimento do Contrato</h3>
+            <form id="contractsForm" class="form-grid">
+              <label>Nome do contrato<input name="contractName" placeholder="Ex.: Casa Operacional A" /></label>
+              <label>Rua do alojamento<input name="accommodationStreet" /></label>
+              <label>Número<input name="accommodationNumber" /></label>
+              <label>Complemento<input name="accommodationComplement" /></label>
+              <label>Bairro<input name="accommodationDistrict" /></label>
+              <label>Cidade<input name="accommodationCity" /></label>
+              <label>Estado (UF)<input name="accommodationState" maxlength="2" placeholder="Ex.: MG" /></label>
+              <label>CEP<input name="accommodationZipCode" inputmode="numeric" maxlength="9" placeholder="00000-000" /></label>
+              <label>Cliente vinculado
+                <select name="clientId" id="contractsClientSelect">
+                  <option value="">Selecionar cliente salvo</option>
+                </select>
+              </label>
+              <label>Imóvel alugado vinculado
+                <select name="rentedPropertyId" id="contractsRentedPropertySelect">
+                  <option value="">Selecionar imóvel alugado</option>
+                </select>
+              </label>
+              <label>Capacidade de pessoas<input name="capacity" type="number" min="0" value="0" /></label>
+              <label>Valor da diária por pessoa (R$)<input name="dailyRatePerPerson" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Imposto mensal sobre faturamento (%)<input name="monthlyTaxPercent" type="number" min="0" step="0.01" value="0" /></label>
+              <label>Início da medição (dia do mês)<input name="measurementStartDay" type="number" min="1" max="31" value="24" /></label>
+              <label>Fim da medição (dia do mês)<input name="measurementEndDay" type="number" min="1" max="31" value="24" /></label>
+              <label>Dia previsto de recebimento<input name="receiptDay" type="number" min="1" max="31" value="15" /></label>
+              <label>Aluguel (R$)<input name="rentCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Funcionário (R$)<input name="staffCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Mobília completa (R$) - custo único<input name="furnitureCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Produtos de limpeza (R$)<input name="cleaningProductsCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Água (R$)<input name="waterCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Luz (R$)<input name="electricityCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Internet (R$)<input name="internetCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Manutenções (R$)<input name="maintenanceCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Pró-labore mensal (R$)<input name="proLaboreCost" type="text" inputmode="numeric" data-brl value="R$ 0,00" /></label>
+              <label>Recebedor do pró-labore<input name="proLaboreRecipient" placeholder="Ex.: Fred Marques" /></label>
+            </form>
+            <div id="contractsOpenSummary" class="panel contracts-open-summary"></div>
+          </div>
+          <div id="contractsListContainer" class="panel">
+            <div id="contractsListActions" class="balance-mode-switch" style="margin-bottom: 8px;">
+              <button id="btnShowEffectiveContracts" type="button" class="btn btn-primary">Efetivados</button>
+              <button id="btnShowDraftContracts" type="button" class="btn">Rascunhos</button>
+            </div>
+            <div id="contractsOpenActions" class="balance-mode-switch auth-hidden" style="margin-bottom: 8px;">
+              <button id="btnBackToContractsList" type="button" class="btn">Voltar para Contratos</button>
+            </div>
+            <div id="contractsSavedList"></div>
+          </div>
+        </section>
+      </section>
+
+      <section id="rentedPropertiesModule" class="module">
+        <section class="panel">
+          <h2>Imóveis Alugados</h2>
+          <div class="balance-controls">
+            <div class="balance-mode-switch">
+              <button id="btnNewRentedProperty" type="button" class="btn">Novo imóvel alugado</button>
+              <button id="btnBackToRentedPropertiesList" type="button" class="btn auth-hidden">Voltar para Imóveis Alugados</button>
+            </div>
+          </div>
+          <div id="rentedPropertyFormContainer" class="panel auth-hidden" style="margin-bottom: 12px;">
+            <form id="rentedPropertyForm" class="form-grid">
+              <label>Nome do imóvel<input name="name" required placeholder="Ex.: Casa Vila Marques 01" /></label>
+              <label>Contrato vinculado
+                <select name="contractId" id="rentedPropertyContractSelect">
+                  <option value="">Selecionar contrato (opcional)</option>
+                </select>
+              </label>
+              <label>Rua<input name="street" /></label>
+              <label>Número<input name="number" /></label>
+              <label>Complemento<input name="complement" /></label>
+              <label>Bairro<input name="district" /></label>
+              <label>Cidade<input name="city" /></label>
+              <label>Estado (UF)<input name="state" maxlength="2" placeholder="Ex.: MG" /></label>
+              <label>CEP<input name="zipCode" inputmode="numeric" maxlength="9" placeholder="00000-000" /></label>
+              <label>Valor do aluguel mensal (R$)<input name="rentAmount" type="text" inputmode="numeric" data-brl value="R$ 0,00" required /></label>
+              <label>Início do contrato<input name="contractStartDateISO" type="date" required /></label>
+              <label>Término do contrato<input name="contractEndDateISO" type="date" required /></label>
+              <label>Próximo vencimento<input name="nextDueDateISO" type="date" required /></label>
+              <div class="full row-end">
+                <button id="btnSaveRentedProperty" type="submit" class="btn btn-primary">Salvar imóvel alugado</button>
+              </div>
+            </form>
+          </div>
+          <div id="rentedPropertiesListContainer" class="panel">
+            <div id="rentedPropertiesSavedList"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <button id="btnClear" class="btn btn-danger">Limpar tudo</button>
+      <button id="btnLogout" class="btn">Sair</button>
+    </footer>
+
+    <script src="/app.js"></script>
+    </div>
+  </body>
+</html>
