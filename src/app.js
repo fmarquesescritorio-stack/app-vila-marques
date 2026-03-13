@@ -2271,6 +2271,9 @@ function hasValue(value) {
 function renderProposal() {
   const output = document.getElementById("proposalOutput");
   const totals = calculateTotal();
+  const showMarginRow = Number(totals.marginPercent || 0) > 0;
+  const showAdminFeeRow = Number(totals.adminFeePercent || 0) > 0;
+  const showDiscountRow = Number(totals.discountPercent || 0) > 0;
 
   const propertyName = state.property.name || "Não informado";
   const fullAddress = buildFullAddress(state.property);
@@ -2417,9 +2420,9 @@ function renderProposal() {
         <div class="doc-totals">
           <div class="doc-row"><span>Base diária (${totals.capacity} pessoa(s) x ${currencyBRL.format(totals.dailyRatePerPerson)})</span><strong>${currencyBRL.format(totals.dailyHostingTotal)}</strong></div>
           <div class="doc-row"><span>Valor mensal (diária x 30)</span><strong>${currencyBRL.format(totals.monthlyValue)}</strong></div>
-          <div class="doc-row"><span>Margem comercial (${totals.marginPercent}%)</span><strong>${currencyBRL.format(totals.marginValue)}</strong></div>
-          <div class="doc-row"><span>Taxa administrativa (${totals.adminFeePercent}%)</span><strong>${currencyBRL.format(totals.adminFeeValue)}</strong></div>
-          <div class="doc-row"><span>Desconto (${totals.discountPercent}%)</span><strong>- ${currencyBRL.format(totals.discountValue)}</strong></div>
+          ${showMarginRow ? `<div class="doc-row"><span>Margem comercial (${totals.marginPercent}%)</span><strong>${currencyBRL.format(totals.marginValue)}</strong></div>` : ""}
+          ${showAdminFeeRow ? `<div class="doc-row"><span>Taxa administrativa (${totals.adminFeePercent}%)</span><strong>${currencyBRL.format(totals.adminFeeValue)}</strong></div>` : ""}
+          ${showDiscountRow ? `<div class="doc-row"><span>Desconto (${totals.discountPercent}%)</span><strong>- ${currencyBRL.format(totals.discountValue)}</strong></div>` : ""}
           <div class="doc-row doc-highlight"><span>Valor final da proposta</span><span>${currencyBRL.format(totals.final)}</span></div>
         </div>
       </section>
