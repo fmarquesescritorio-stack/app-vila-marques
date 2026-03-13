@@ -1114,17 +1114,7 @@ function normalizeStatePatterns() {
     }
   }
 
-  state.exports = (state.exports || [])
-    .map((item) => ({
-      id: String(item.id || ""),
-      type: item.type === "payslip" ? "payslip" : "proposal",
-      exportedAt: String(item.exportedAt || ""),
-      proposalNumber: String(item.proposalNumber || "").trim(),
-      companyName: String(item.companyName || "").trim(),
-      snapshot: item.snapshot || {},
-      cloudStatus: String(item.cloudStatus || "pending"),
-    }))
-    .filter((item) => item.id && item.exportedAt);
+  state.exports = mergeExportRecords(state.exports || [], []);
 }
 
 function saveState() {
@@ -1149,6 +1139,19 @@ async function saveCloudStateNow() {
   cloudSyncState.saveInFlight = true;
   try {
     const payload = getStateSnapshot();
+    try {
+      const { data: currentCloud } = await authState.client
+        .from("app_user_state")
+        .select("state_data")
+        .eq("user_id", authState.user.id)
+        .maybeSingle();
+      const cloudExports = Array.isArray(currentCloud?.state_data?.exports)
+        ? currentCloud.state_data.exports
+        : [];
+      payload.exports = mergeExportRecords(payload.exports, cloudExports);
+    } catch (_error) {
+      // Se não conseguir ler estado atual da nuvem, mantém o payload local.
+    }
     const { error } = await authState.client
       .from("app_user_state")
       .upsert(
@@ -1204,16 +1207,27 @@ async function syncStateFromCloudOnLogin() {
     const localSavedAt = getSnapshotSavedAt(localSnapshot);
     const cloudSnapshot = data?.state_data && typeof data.state_data === "object" ? data.state_data : null;
     const cloudSavedAt = getSnapshotSavedAt(cloudSnapshot) || (data?.updated_at ? new Date(data.updated_at) : null);
+    const mergedExports = mergeExportRecords(localSnapshot?.exports, cloudSnapshot?.exports);
 
     cloudSyncState.suppressSave = true;
     if (cloudSnapshot && (!localSavedAt || (cloudSavedAt && cloudSavedAt > localSavedAt))) {
-      applyStateSnapshot(cloudSnapshot);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudSnapshot));
+      const mergedCloudSnapshot = cloneSnapshot(cloudSnapshot);
+      mergedCloudSnapshot.exports = mergedExports;
+      applyStateSnapshot(mergedCloudSnapshot);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedCloudSnapshot));
     } else if (localSnapshot) {
-      applyStateSnapshot(localSnapshot);
+      const mergedLocalSnapshot = cloneSnapshot(localSnapshot);
+      mergedLocalSnapshot.exports = mergedExports;
+      applyStateSnapshot(mergedLocalSnapshot);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedLocalSnapshot));
       if (!cloudSnapshot || (localSavedAt && (!cloudSavedAt || localSavedAt > cloudSavedAt))) {
         await saveCloudStateNow();
       }
+    } else if (cloudSnapshot) {
+      const mergedCloudSnapshot = cloneSnapshot(cloudSnapshot);
+      mergedCloudSnapshot.exports = mergedExports;
+      applyStateSnapshot(mergedCloudSnapshot);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedCloudSnapshot));
     }
     cloudSyncState.suppressSave = false;
     cloudSyncState.hasLoadedFromCloud = true;
@@ -1692,6 +1706,43 @@ function cloneSnapshot(data) {
   return JSON.parse(JSON.stringify(data));
 }
 
+function normalizeExportRecord(item) {
+  return {
+    id: String(item?.id || ""),
+    type: item?.type === "payslip" ? "payslip" : "proposal",
+    exportedAt: String(item?.exportedAt || ""),
+    proposalNumber: String(item?.proposalNumber || "").trim(),
+    companyName: String(item?.companyName || "").trim(),
+    snapshot: item?.snapshot && typeof item.snapshot === "object" ? item.snapshot : {},
+    cloudStatus: String(item?.cloudStatus || "pending"),
+  };
+}
+
+function mergeExportRecords(primaryList, secondaryList) {
+  const merged = new Map();
+  const pushRecord = (record) => {
+    const normalized = normalizeExportRecord(record);
+    if (!normalized.id || !normalized.exportedAt) return;
+    const existing = merged.get(normalized.id);
+    if (!existing) {
+      merged.set(normalized.id, normalized);
+      return;
+    }
+    const existingTs = new Date(existing.exportedAt).getTime();
+    const nextTs = new Date(normalized.exportedAt).getTime();
+    if (Number.isNaN(existingTs) || (!Number.isNaN(nextTs) && nextTs >= existingTs)) {
+      merged.set(normalized.id, normalized);
+    }
+  };
+
+  (Array.isArray(primaryList) ? primaryList : []).forEach(pushRecord);
+  (Array.isArray(secondaryList) ? secondaryList : []).forEach(pushRecord);
+
+  return Array.from(merged.values())
+    .sort((a, b) => new Date(b.exportedAt).getTime() - new Date(a.exportedAt).getTime())
+    .slice(0, 500);
+}
+
 function registerExport(type) {
   const exportRecord = {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -1708,7 +1759,6 @@ function registerExport(type) {
       pricing: state.pricing,
       proposal: state.proposal,
       payslip: state.payslip,
-      balance: state.balance,
       contracts: state.contracts,
     }),
     cloudStatus: "pending",
