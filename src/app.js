@@ -18,7 +18,7 @@ const LOCAL_TEST_USERNAME = "teste";
 const LOCAL_TEST_PASSWORD = "teste";
 const ALLOW_LOCAL_TEST_LOGIN = false;
 const ALLOW_PUBLIC_SIGNUP = false;
-const FIXED_LOGO_PATH = "./assets/logo-vila-marques.png";
+const FIXED_LOGO_PATH = "/src/assets/logo-vila-marques.png";
 const CONTRACTOR_INFO = {
   companyName: "Vila Marques Alojamentos",
   cnpj: "58.924.922/0001-75",
@@ -1281,6 +1281,21 @@ async function fetchSharedStateFromCloud() {
   return data || null;
 }
 
+async function fetchLegacyUserStateFromCloud() {
+  if (authState.mode !== "supabase" || !authState.client || !authState.user) return null;
+  try {
+    const { data, error } = await authState.client
+      .from("app_user_state")
+      .select("state_data, updated_at")
+      .eq("user_id", authState.user.id)
+      .maybeSingle();
+    if (error) return null;
+    return data || null;
+  } catch {
+    return null;
+  }
+}
+
 async function refreshStateFromCloudIfNewer(force = false) {
   if (authState.mode !== "supabase" || !authState.client || !authState.user) return;
   const data = await fetchSharedStateFromCloud();
@@ -1329,7 +1344,20 @@ async function syncStateFromCloudOnLogin() {
   if (cloudSyncState.hasLoadedFromCloud) return;
 
   try {
-    const data = await fetchSharedStateFromCloud();
+    let data = await fetchSharedStateFromCloud();
+    const cloudSnapshotInitial = data?.state_data && typeof data.state_data === "object" ? data.state_data : null;
+    if (!hasStateContent(cloudSnapshotInitial)) {
+      const legacyData = await fetchLegacyUserStateFromCloud();
+      const legacySnapshot = legacyData?.state_data && typeof legacyData.state_data === "object"
+        ? legacyData.state_data
+        : null;
+      if (hasStateContent(legacySnapshot)) {
+        data = {
+          state_data: legacySnapshot,
+          updated_at: legacyData?.updated_at || new Date().toISOString(),
+        };
+      }
+    }
 
     const localRaw = localStorage.getItem(STORAGE_KEY);
     const localSnapshot = localRaw ? JSON.parse(localRaw) : null;
@@ -3043,7 +3071,7 @@ function printHtmlContent({ title, bodyClass = "", contentHtml }) {
   iframe.style.opacity = "0";
   iframe.style.pointerEvents = "none";
   document.body.appendChild(iframe);
-  const stylesHref = new URL("./styles.css", window.location.href).href;
+  const stylesHref = `${window.location.origin}/src/styles.css`;
   const safeTitle = escapeHtml(title || "Documento");
   const safeBodyClass = String(bodyClass || "").trim();
   const printDocument = iframe.contentDocument;
