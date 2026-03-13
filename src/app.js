@@ -108,6 +108,7 @@ const state = {
   activeContractId: "",
   rentedProperties: [],
   exports: [],
+  deletedExportIds: [],
 };
 const uiState = {
   activeTab: "proposals",
@@ -842,6 +843,7 @@ function applyStateSnapshot(data) {
   state.activeContractId = String(data.activeContractId || "").trim();
   state.rentedProperties = Array.isArray(data.rentedProperties) ? data.rentedProperties : [];
   state.exports = Array.isArray(data.exports) ? data.exports : [];
+  state.deletedExportIds = Array.isArray(data.deletedExportIds) ? data.deletedExportIds : [];
   normalizeStatePatterns();
   return true;
 }
@@ -864,6 +866,7 @@ function getStateSnapshot() {
     activeContractId: String(state.activeContractId || "").trim(),
     rentedProperties: cloneSnapshot(state.rentedProperties || []),
     exports: cloneSnapshot(state.exports || []),
+    deletedExportIds: cloneSnapshot(state.deletedExportIds || []),
     savedAt: new Date().toISOString(),
   };
 }
@@ -1120,6 +1123,15 @@ function normalizeStatePatterns() {
   }
 
   state.exports = mergeExportRecords(state.exports || [], []);
+  state.deletedExportIds = Array.isArray(state.deletedExportIds)
+    ? state.deletedExportIds
+      .map((id) => String(id || "").trim())
+      .filter(Boolean)
+    : [];
+  const deletedSet = new Set(state.deletedExportIds);
+  if (deletedSet.size > 0) {
+    state.exports = state.exports.filter((entry) => !deletedSet.has(String(entry.id || "")));
+  }
 }
 
 function saveState() {
@@ -1808,7 +1820,10 @@ function mergeExportRecords(primaryList, secondaryList) {
 }
 
 function getAllAvailableExports() {
-  return mergeExportRecords(state.exports || [], cloudSyncState.sharedExports || []);
+  const deletedSet = new Set((state.deletedExportIds || []).map((id) => String(id || "").trim()).filter(Boolean));
+  const merged = mergeExportRecords(state.exports || [], cloudSyncState.sharedExports || []);
+  if (!deletedSet.size) return merged;
+  return merged.filter((entry) => !deletedSet.has(String(entry.id || "")));
 }
 
 async function syncExportRecordToCloudChannels(exportRecord) {
@@ -1845,6 +1860,7 @@ function registerExport(type) {
     createdByEmail: String(authState.user?.email || "").trim().toLowerCase(),
   };
 
+  state.deletedExportIds = (state.deletedExportIds || []).filter((id) => String(id || "").trim() !== exportRecord.id);
   state.exports = [exportRecord, ...(state.exports || [])].slice(0, 500);
   saveState();
   void logAuditAction({
@@ -8261,6 +8277,8 @@ function bindEvents() {
       if (!confirm("Deseja apagar este documento exportado do histórico?")) return;
       state.exports = (state.exports || []).filter((entry) => entry.id !== exportId);
       cloudSyncState.sharedExports = (cloudSyncState.sharedExports || []).filter((entry) => entry.id !== exportId);
+      if (!Array.isArray(state.deletedExportIds)) state.deletedExportIds = [];
+      if (!state.deletedExportIds.includes(exportId)) state.deletedExportIds.push(exportId);
       saveState();
       void deleteSharedExportFromCloud(exportId).then(async (ok) => {
         if (!ok && authState.mode === "supabase") {
