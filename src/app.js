@@ -881,6 +881,7 @@ function normalizeStatePatterns() {
   state.company.phone = formatPhoneBR(state.company.phone);
   state.company.email = String(state.company.email || "").trim().toLowerCase();
   state.property.zipCode = formatCEP(state.property.zipCode);
+  state.property.dailyRatePerPerson = String(parseBRLNumber(state.property.dailyRatePerPerson || 0));
   state.property.state = String(state.property.state || "")
     .toUpperCase()
     .replace(/[^A-Z]/g, "")
@@ -2275,7 +2276,7 @@ function renderList(container, list, labelFn, onRemove) {
 
 function calculateTotal() {
   const capacity = Number(state.property.capacity || 0);
-  const dailyRatePerPerson = Number(state.property.dailyRatePerPerson || 0);
+  const dailyRatePerPerson = parseBRLNumber(state.property.dailyRatePerPerson || 0);
   const dailyHostingTotal = capacity * dailyRatePerPerson;
   const monthlyValue = dailyHostingTotal * 30;
 
@@ -2435,7 +2436,7 @@ function renderProposal() {
           <div><strong>Banheiros:</strong> ${escapeHtml(state.property.bathrooms || "-")}</div>
           <div><strong>Garagem:</strong> ${escapeHtml(state.property.garageSpots || "-")}</div>
           <div><strong>Área de serviço:</strong> ${escapeHtml(state.property.serviceAreaType || "-")}</div>
-          <div><strong>Diária por pessoa:</strong> ${currencyBRL.format(Number(state.property.dailyRatePerPerson || 0))}</div>
+          <div><strong>Diária por pessoa:</strong> ${currencyBRL.format(parseBRLNumber(state.property.dailyRatePerPerson || 0))}</div>
           <div><strong>Total diária do imóvel:</strong> ${currencyBRL.format(totals.dailyHostingTotal)}</div>
           ${addressRowHtml}
           ${propertyDescriptionRow}
@@ -5886,6 +5887,7 @@ function renderAll() {
   refreshBrazilianPatternInputs();
   setupBRLInputs(document.getElementById("clientCatalogForm"));
   setupBRLInputs(document.getElementById("employeeCatalogForm"));
+  setupBRLInputs(document.getElementById("propertyForm"));
   setupBRLInputs(document.getElementById("payslipForm"));
   setupBRLInputs(document.getElementById("earningForm"));
   setupBRLInputs(document.getElementById("discountForm"));
