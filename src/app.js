@@ -5965,6 +5965,7 @@ function renderExports() {
           <td>${escapeHtml(cloudStatusLabel(entry.cloudStatus))}</td>
           <td>
             <div class="exports-actions">
+              <button type="button" class="btn" data-action="preview-export" data-export-id="${escapeHtml(entry.id)}">${entry.type === "payslip" ? "Ver contracheque" : "Ver proposta"}</button>
               <button type="button" class="btn" data-action="edit-export" data-export-id="${escapeHtml(entry.id)}">Abrir para editar</button>
               <button type="button" class="btn" data-action="sync-export" data-export-id="${escapeHtml(entry.id)}">Sincronizar</button>
               <button type="button" class="btn btn-danger" data-action="delete-export" data-export-id="${escapeHtml(entry.id)}">Apagar</button>
@@ -6016,6 +6017,46 @@ function loadExportForEditing(exportRecord) {
     renderAll();
     setActiveTab("proposals");
     setProposalStep(1);
+    return;
+  }
+
+  if (exportRecord.type === "payslip") {
+    state.payslip = {
+      ...state.payslip,
+      ...cloneSnapshot(snapshot.payslip || {}),
+      earnings: cloneSnapshot((snapshot.payslip && snapshot.payslip.earnings) || []),
+      discounts: cloneSnapshot((snapshot.payslip && snapshot.payslip.discounts) || []),
+    };
+    normalizeStatePatterns();
+    saveState();
+    uiState.payslipFormOpen = true;
+    renderAll();
+    setActiveTab("payslip");
+  }
+}
+
+function loadExportForPreview(exportRecord) {
+  if (!exportRecord || !exportRecord.snapshot) return;
+  const snapshot = exportRecord.snapshot;
+
+  if (exportRecord.type === "proposal") {
+    state.company = cloneSnapshot(snapshot.company || {});
+    state.clients = cloneSnapshot(snapshot.clients || state.clients || []);
+    state.property = cloneSnapshot(snapshot.property || {});
+    state.furniture = cloneSnapshot(snapshot.furniture || []);
+    state.proposalPhotos = cloneSnapshot(snapshot.proposalPhotos || []);
+    state.pricing = cloneSnapshot(snapshot.pricing || {});
+    state.proposal = cloneSnapshot(snapshot.proposal || {});
+    persistActiveContract({
+      ...(getActiveContractRecord() || state.contracts),
+      ...cloneSnapshot(snapshot.contracts || {}),
+    });
+    normalizeStatePatterns();
+    saveState();
+    uiState.proposalStarted = true;
+    renderAll();
+    setActiveTab("proposals");
+    setProposalStep(6);
     return;
   }
 
@@ -8195,6 +8236,11 @@ function bindEvents() {
 
     if (action === "edit-export") {
       loadExportForEditing(exportRecord);
+      return;
+    }
+
+    if (action === "preview-export") {
+      loadExportForPreview(exportRecord);
       return;
     }
 
