@@ -1,12 +1,18 @@
 {
   "version": 2,
-  "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/src/index.html"
-    }
+    { "source": "/", "destination": "/src/index.html" },
+    { "source": "/inicio", "destination": "/src/index.html" },
+    { "source": "/propostas", "destination": "/src/index.html" },
+    { "source": "/clientes", "destination": "/src/index.html" },
+    { "source": "/funcionarios", "destination": "/src/index.html" },
+    { "source": "/contracheque", "destination": "/src/index.html" },
+    { "source": "/balanco", "destination": "/src/index.html" },
+    { "source": "/impostos", "destination": "/src/index.html" },
+    { "source": "/contratos", "destination": "/src/index.html" },
+    { "source": "/imoveis-alugados", "destination": "/src/index.html" },
+    { "source": "/exportados", "destination": "/src/index.html" }
   ],
   "headers": [
     {
