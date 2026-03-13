@@ -647,6 +647,32 @@ input:focus, select:focus, textarea:focus {
   background: #fff;
 }
 
+.proposal-doc.proposal-doc-pdf .doc-header {
+  padding: 14px;
+}
+
+.proposal-doc.proposal-doc-pdf .doc-section {
+  padding: 12px 14px;
+}
+
+.proposal-doc.proposal-doc-pdf .doc-footer {
+  padding: 12px 14px 14px;
+}
+
+.proposal-doc.proposal-doc-pdf .doc-table th,
+.proposal-doc.proposal-doc-pdf .doc-table td {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.proposal-doc.proposal-doc-pdf .doc-row {
+  padding: 6px 0;
+}
+
+.proposal-doc.proposal-doc-pdf .doc-numbered-list {
+  line-height: 1.45;
+}
+
 .doc-header {
   display: flex;
   justify-content: space-between;

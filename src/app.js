@@ -2568,7 +2568,7 @@ function renderProposal() {
         </div>
       </section>
 
-      <section class="doc-section doc-section-narrow doc-avoid-break">
+      <section class="doc-section doc-section-narrow">
         <h4>6. Vigência e Pagamento</h4>
         <div class="doc-grid">
           <div><strong>Vigência inicial:</strong> ${formatDateBR(state.proposal.contractStartDate)}</div>
@@ -2581,7 +2581,7 @@ function renderProposal() {
         </div>
       </section>
 
-      <section class="doc-section doc-section-narrow doc-avoid-break">
+      <section class="doc-section doc-section-narrow">
         <h4>7. Responsabilidades Contratuais</h4>
         <p>
           Ficam sob responsabilidade do contratado todos os encargos referentes a aluguel, IPTU, água, energia
@@ -3008,10 +3008,7 @@ async function exportProposalAsPdfFile(proposalDocNode) {
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        pagebreak: {
-          mode: ["css", "legacy"],
-          avoid: [".doc-avoid-break", ".doc-footer", ".doc-section h4", ".doc-table tr"],
-        },
+        pagebreak: { mode: ["css"] },
       })
       .from(proposalDocNode)
       .save();
