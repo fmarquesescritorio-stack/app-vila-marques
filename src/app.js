@@ -1746,8 +1746,12 @@ function normalizePathname(pathname) {
     .toLowerCase();
 }
 
-function getTabFromPath(pathname) {
-  const normalizedPath = normalizePathname(pathname || window.location.pathname);
+function getTabFromLocation() {
+  const rawHash = String(window.location.hash || "").trim();
+  const hashPath = rawHash.replace(/^#\/?/, "");
+  const normalizedHashPath = normalizePathname(hashPath);
+  if (normalizedHashPath) return SLUG_TO_TAB[normalizedHashPath] || "home";
+  const normalizedPath = normalizePathname(window.location.pathname);
   if (!normalizedPath) return "home";
   return SLUG_TO_TAB[normalizedPath] || "home";
 }
@@ -1757,16 +1761,20 @@ function getPathForTab(tabName) {
   return `/${TAB_TO_SLUG[safeTab] || TAB_TO_SLUG.home}`;
 }
 
+function getHashForTab(tabName) {
+  const safeTab = APP_TABS.includes(tabName) ? tabName : "home";
+  return `#/${TAB_TO_SLUG[safeTab] || TAB_TO_SLUG.home}`;
+}
+
 function syncUrlWithTab(tabName, options = {}) {
   const { replace = false } = options;
-  const nextPath = getPathForTab(tabName);
-  const currentPath = window.location.pathname || "/";
-  if (currentPath === nextPath) return;
+  const nextHash = getHashForTab(tabName);
+  if ((window.location.hash || "") === nextHash) return;
   if (replace) {
-    window.history.replaceState({ tab: tabName }, "", nextPath);
+    window.history.replaceState({ tab: tabName }, "", `${window.location.pathname}${nextHash}`);
     return;
   }
-  window.history.pushState({ tab: tabName }, "", nextPath);
+  window.location.hash = nextHash;
 }
 
 function toggleSupabaseConfig(forceShow) {
@@ -1783,8 +1791,7 @@ function toggleSupabaseConfig(forceShow) {
 }
 
 function getRedirectUrl() {
-  const safeTab = canAccessTab(uiState.activeTab) ? uiState.activeTab : "home";
-  return `${window.location.origin}${getPathForTab(safeTab)}`;
+  return `${window.location.origin}/`;
 }
 
 async function initAuthClient() {
@@ -1857,7 +1864,7 @@ async function initAuthClient() {
     if (authState.user) {
       await syncStateFromCloudOnLogin();
       await loadSharedExportsFromCloud(true);
-      setActiveTab(getTabFromPath(window.location.pathname), { replaceUrl: true });
+      setActiveTab(getTabFromLocation(), { replaceUrl: true });
     }
     showAppShell(Boolean(authState.user));
     renderAll();
@@ -1878,7 +1885,7 @@ async function initAuthClient() {
   } else {
     await syncStateFromCloudOnLogin();
     await loadSharedExportsFromCloud(true);
-    setActiveTab(getTabFromPath(window.location.pathname), { replaceUrl: true });
+    setActiveTab(getTabFromLocation(), { replaceUrl: true });
   }
   renderAll();
 }
@@ -6774,11 +6781,13 @@ function bindEvents() {
     renderAll();
   });
 
-  window.addEventListener("popstate", () => {
-    const tabFromUrl = getTabFromPath(window.location.pathname);
+  const applyTabFromUrl = () => {
+    const tabFromUrl = getTabFromLocation();
     setActiveTab(tabFromUrl, { syncUrl: false });
     renderAll();
-  });
+  };
+  window.addEventListener("popstate", applyTabFromUrl);
+  window.addEventListener("hashchange", applyTabFromUrl);
 
   window.addEventListener("focus", () => {
     void refreshStateFromCloudIfNewer(false);
@@ -6936,7 +6945,7 @@ function bindEvents() {
     renderAll();
   });
 
-  setActiveTab(getTabFromPath(window.location.pathname), { replaceUrl: true });
+  setActiveTab(getTabFromLocation(), { replaceUrl: true });
   uiState.proposalStarted = false;
   setProposalStep(1);
   renderProposalEntryGate();
