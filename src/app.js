@@ -2804,6 +2804,61 @@ function printHtmlContent({ title, bodyClass = "", contentHtml }) {
   return true;
 }
 
+function waitForAnimationFrames(count = 2) {
+  return new Promise((resolve) => {
+    const steps = Math.max(1, Number(count || 1));
+    let done = 0;
+    const next = () => {
+      done += 1;
+      if (done >= steps) {
+        resolve();
+        return;
+      }
+      window.requestAnimationFrame(next);
+    };
+    window.requestAnimationFrame(next);
+  });
+}
+
+function waitForImagesInNode(node, timeoutMs = 5000) {
+  const container = node instanceof Element ? node : null;
+  if (!container) return Promise.resolve();
+  const pending = Array.from(container.querySelectorAll("img"))
+    .filter((img) => String(img.currentSrc || img.src || "").trim())
+    .filter((img) => !img.complete);
+  if (!pending.length) return Promise.resolve();
+
+  return Promise.all(
+    pending.map((img) => new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      img.addEventListener("load", finish, { once: true });
+      img.addEventListener("error", finish, { once: true });
+      window.setTimeout(finish, timeoutMs);
+    })),
+  ).then(() => undefined);
+}
+
+async function waitForProposalRenderReady(node) {
+  await waitForAnimationFrames(2);
+  if (document.fonts && typeof document.fonts.ready?.then === "function") {
+    try {
+      await Promise.race([
+        document.fonts.ready,
+        new Promise((resolve) => window.setTimeout(resolve, 2500)),
+      ]);
+    } catch (_error) {
+      // Ignora falha de API de fontes e segue.
+    }
+  }
+  await waitForImagesInNode(node, 5000);
+  await waitForAnimationFrames(1);
+}
+
 function loadExternalScript(src) {
   return new Promise((resolve, reject) => {
     const existing = document.querySelector(`script[data-external-src="${src}"]`);
@@ -2857,6 +2912,7 @@ async function exportProposalAsPdfFile(proposalDocNode) {
   const clone = proposalDocNode.cloneNode(true);
   mount.appendChild(clone);
   document.body.appendChild(mount);
+  await waitForProposalRenderReady(clone);
 
   const proposalNumber = String(state.proposal?.proposalNumber || "").trim();
   const issueDate = String(state.proposal?.issueDate || "").trim();
@@ -7853,6 +7909,7 @@ function bindEvents() {
       }
       return;
     }
+    await waitForProposalRenderReady(proposalDoc);
     const downloaded = await exportProposalAsPdfFile(proposalDoc);
     if (downloaded) {
       registerExport("proposal");
