@@ -2901,6 +2901,7 @@ async function exportProposalAsPdfFile(proposalDocNode) {
   const hasLib = await ensureHtml2PdfBundle();
   if (!hasLib || !window.html2pdf) return false;
   await waitForProposalRenderReady(proposalDocNode);
+  proposalDocNode.classList.add("proposal-doc-pdf");
 
   const proposalNumber = String(state.proposal?.proposalNumber || "").trim();
   const issueDate = String(state.proposal?.issueDate || "").trim();
@@ -2912,18 +2913,23 @@ async function exportProposalAsPdfFile(proposalDocNode) {
   try {
     await window.html2pdf()
       .set({
-        margin: [8, 8, 8, 8],
+        margin: [12, 10, 14, 10],
         filename,
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        pagebreak: { mode: ["css", "legacy"] },
+        pagebreak: {
+          mode: ["css", "legacy"],
+          avoid: [".doc-avoid-break", ".doc-footer", ".doc-section h4", ".doc-table tr"],
+        },
       })
       .from(proposalDocNode)
       .save();
     return true;
   } catch (_error) {
     return false;
+  } finally {
+    proposalDocNode.classList.remove("proposal-doc-pdf");
   }
 }
 

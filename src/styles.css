@@ -636,6 +636,17 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 12px 28px rgba(17, 24, 39, 0.08);
 }
 
+.proposal-doc.proposal-doc-pdf {
+  width: 190mm;
+  max-width: 190mm;
+  margin: 0 auto;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+  background: #fff;
+}
+
 .doc-header {
   display: flex;
   justify-content: space-between;
