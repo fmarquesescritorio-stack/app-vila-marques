@@ -2927,6 +2927,44 @@ async function exportProposalAsPdfFile(proposalDocNode) {
   }
 }
 
+async function exportPayslipAsPdfFile(payslipSheetNode) {
+  if (!payslipSheetNode) return false;
+  const hasLib = await ensureHtml2PdfBundle();
+  if (!hasLib || !window.html2pdf) return false;
+  await waitForProposalRenderReady(payslipSheetNode);
+
+  payslipSheetNode.classList.add("payslip-sheet-pdf");
+  const paymentDate = String(state.payslip?.paymentDate || "").trim();
+  const dateSuffix = paymentDate
+    ? paymentDate.replaceAll("-", "")
+    : new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  const employeeName = String(state.payslip?.employeeName || "funcionario")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "funcionario";
+  const filename = `contracheque-${employeeName}-${dateSuffix}.pdf`;
+
+  try {
+    await window.html2pdf()
+      .set({
+        margin: [5, 5, 5, 5],
+        filename,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        pagebreak: { mode: ["css", "legacy"] },
+      })
+      .from(payslipSheetNode)
+      .save();
+    return true;
+  } catch (_error) {
+    return false;
+  } finally {
+    payslipSheetNode.classList.remove("payslip-sheet-pdf");
+  }
+}
+
 function toMonthKey(dateTimeStr) {
   const dt = new Date(dateTimeStr);
   if (Number.isNaN(dt.getTime())) return "Sem data";
@@ -7914,31 +7952,52 @@ function bindEvents() {
     }
   });
 
-  document.getElementById("btnExportPayslipPdf").addEventListener("click", () => {
+  document.getElementById("btnExportPayslipPdf").addEventListener("click", async () => {
     if (!hasPermission("exportPayslip")) {
       alert("Sem permissão para exportar contracheque.");
       return;
     }
     if (!validatePayslipRequiredFields()) return;
+    const exportBtn = document.getElementById("btnExportPayslipPdf");
+    if (exportBtn) {
+      exportBtn.disabled = true;
+      exportBtn.textContent = "Gerando PDF...";
+    }
     setActiveTab("payslip");
     document.body.classList.add("print-payslip");
     renderPayslip();
-    const payslipOutput = document.getElementById("payslipOutput");
-    const payslipHtml = payslipOutput?.innerHTML || "";
-    if (!payslipHtml.trim()) {
+    const payslipSheet = document.querySelector("#payslipOutput .payslip-sheet");
+    if (!payslipSheet) {
       alert("Não foi possível gerar o contracheque para impressão.");
       document.body.classList.remove("print-payslip");
+      if (exportBtn) {
+        exportBtn.disabled = false;
+        exportBtn.textContent = "Exportar contracheque A4";
+      }
       return;
     }
-    const ok = printHtmlContent({
-      title: "Contracheque",
-      bodyClass: "print-payslip",
-      contentHtml: `<section id="payslipModule" class="module module-active"><section class="panel payslip-builder"><div class="payslip-output">${payslipHtml}</div></section></section>`,
-    });
-    if (ok) registerExport("payslip");
+    await waitForProposalRenderReady(payslipSheet);
+    const downloaded = await exportPayslipAsPdfFile(payslipSheet);
+    if (downloaded) {
+      registerExport("payslip");
+    } else {
+      const payslipOutput = document.getElementById("payslipOutput");
+      const payslipHtml = payslipOutput?.innerHTML || "";
+      const ok = printHtmlContent({
+        title: "Contracheque",
+        bodyClass: "print-payslip",
+        contentHtml: `<section id="payslipModule" class="module module-active"><section class="panel payslip-builder"><div class="payslip-output">${payslipHtml}</div></section></section>`,
+      });
+      if (ok) registerExport("payslip");
+      else alert("Não foi possível exportar o contracheque em PDF.");
+    }
     window.setTimeout(() => {
       document.body.classList.remove("print-payslip");
     }, 150);
+    if (exportBtn) {
+      exportBtn.disabled = false;
+      exportBtn.textContent = "Exportar contracheque A4";
+    }
   });
 
   window.addEventListener("afterprint", () => {
