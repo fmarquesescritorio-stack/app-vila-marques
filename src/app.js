@@ -2754,6 +2754,87 @@ function printHtmlContent({ title, bodyClass = "", contentHtml }) {
   return true;
 }
 
+function loadExternalScript(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[data-external-src="${src}"]`);
+    if (existing) {
+      if (existing.dataset.loaded === "1") {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error(`Falha ao carregar script: ${src}`)), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.dataset.externalSrc = src;
+    script.addEventListener("load", () => {
+      script.dataset.loaded = "1";
+      resolve();
+    }, { once: true });
+    script.addEventListener("error", () => reject(new Error(`Falha ao carregar script: ${src}`)), { once: true });
+    document.head.appendChild(script);
+  });
+}
+
+async function ensureHtml2PdfBundle() {
+  if (window.html2pdf) return true;
+  try {
+    await loadExternalScript("https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js");
+  } catch (_error) {
+    return false;
+  }
+  return Boolean(window.html2pdf);
+}
+
+async function exportProposalAsPdfFile(proposalDocNode) {
+  if (!proposalDocNode) return false;
+  const hasLib = await ensureHtml2PdfBundle();
+  if (!hasLib || !window.html2pdf) return false;
+
+  const mount = document.createElement("div");
+  mount.style.position = "fixed";
+  mount.style.left = "-100000px";
+  mount.style.top = "0";
+  mount.style.width = "794px";
+  mount.style.background = "#ffffff";
+  mount.style.zIndex = "-1";
+  mount.style.pointerEvents = "none";
+
+  const clone = proposalDocNode.cloneNode(true);
+  mount.appendChild(clone);
+  document.body.appendChild(mount);
+
+  const proposalNumber = String(state.proposal?.proposalNumber || "").trim();
+  const issueDate = String(state.proposal?.issueDate || "").trim();
+  const dateSuffix = issueDate ? issueDate.replaceAll("-", "") : new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  const filename = proposalNumber
+    ? `proposta-${proposalNumber}-${dateSuffix}.pdf`
+    : `proposta-comercial-${dateSuffix}.pdf`;
+
+  try {
+    await window.html2pdf()
+      .set({
+        margin: [8, 8, 8, 8],
+        filename,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        pagebreak: { mode: ["css", "legacy"] },
+      })
+      .from(mount)
+      .save();
+    return true;
+  } catch (_error) {
+    return false;
+  } finally {
+    mount.remove();
+  }
+}
+
 function toMonthKey(dateTimeStr) {
   const dt = new Date(dateTimeStr);
   if (Number.isNaN(dt.getTime())) return "Sem data";
@@ -7699,10 +7780,15 @@ function bindEvents() {
     });
   }
 
-  document.getElementById("btnExportPdf").addEventListener("click", () => {
+  document.getElementById("btnExportPdf").addEventListener("click", async () => {
     if (!hasPermission("exportProposal")) {
       alert("Sem permissão para exportar proposta.");
       return;
+    }
+    const exportBtn = document.getElementById("btnExportPdf");
+    if (exportBtn) {
+      exportBtn.disabled = true;
+      exportBtn.textContent = "Gerando PDF...";
     }
     document.body.classList.remove("print-payslip");
     setActiveTab("proposals");
@@ -7711,13 +7797,27 @@ function bindEvents() {
     const proposalDoc = document.querySelector("#proposalArea .proposal-doc");
     if (!proposalDoc) {
       alert("Não foi possível gerar a proposta para impressão.");
+      if (exportBtn) {
+        exportBtn.disabled = false;
+        exportBtn.textContent = "Exportar proposta em PDF";
+      }
       return;
     }
-    const ok = printHtmlContent({
-      title: "Proposta Comercial",
-      contentHtml: `<section class="panel proposal">${proposalDoc.outerHTML}</section>`,
-    });
-    if (ok) registerExport("proposal");
+    const downloaded = await exportProposalAsPdfFile(proposalDoc);
+    if (downloaded) {
+      registerExport("proposal");
+    } else {
+      const ok = printHtmlContent({
+        title: "Proposta Comercial",
+        contentHtml: `<section class="panel proposal">${proposalDoc.outerHTML}</section>`,
+      });
+      if (ok) registerExport("proposal");
+      else alert("Não foi possível exportar em PDF. Tente novamente.");
+    }
+    if (exportBtn) {
+      exportBtn.disabled = false;
+      exportBtn.textContent = "Exportar proposta em PDF";
+    }
   });
 
   document.getElementById("btnExportPayslipPdf").addEventListener("click", () => {
