@@ -130,7 +130,7 @@ body {
 }
 
 .topbar-logo {
-  width: 320px;
+  width: 210px;
   max-width: 100%;
   height: auto;
 }
@@ -373,6 +373,54 @@ h1, h2 { margin: 0 0 8px; }
 
 .module.module-active {
   display: block;
+}
+
+.home-dashboard-panel {
+  padding: 18px;
+}
+
+.home-greeting {
+  margin-top: 0;
+  margin-bottom: 14px;
+  font-size: 24px;
+  color: #0f172a;
+}
+
+.home-modules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.home-module-card {
+  text-align: left;
+  width: 100%;
+  border: 1px solid #dbe3ed;
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 14px 12px;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.home-module-card strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 16px;
+  color: #0b4f73;
+}
+
+.home-module-card span {
+  display: block;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #475569;
+}
+
+.home-module-card:hover {
+  transform: translateY(-1px);
+  border-color: #0b4f73;
+  box-shadow: 0 8px 18px rgba(11, 79, 115, 0.12);
 }
 
 .stepper-panel {
@@ -1399,7 +1447,7 @@ body.balance-values-blurred #balanceModule .month-profit {
     gap: 6px;
   }
   .topbar-logo {
-    width: min(230px, 100%);
+    width: min(170px, 100%);
     margin: 0;
     display: block;
   }
@@ -1506,6 +1554,8 @@ body.balance-values-blurred #balanceModule .month-profit {
   .balance-entry-layout { grid-template-columns: 1fr; }
   .balance-controls { flex-direction: column; align-items: stretch; }
   .balance-mode-switch { width: 100%; }
+  .home-greeting { font-size: 20px; }
+  .home-modules-grid { grid-template-columns: 1fr; }
   .balance-mode-switch .btn { flex: 1; }
   .balance-filters { flex-direction: column; }
   .balance-filters label { min-width: 100%; }

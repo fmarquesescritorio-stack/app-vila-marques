@@ -71,7 +71,8 @@
         </button>
         <div class="modules-dropdown">
           <div id="modulesMenu" class="modules-menu modules-menu-hidden" aria-label="Módulos do aplicativo">
-            <button id="tabProposals" class="tab-btn tab-btn-active" type="button" data-tab="proposals">Propostas Comerciais</button>
+            <button id="tabHome" class="tab-btn tab-btn-active" type="button" data-tab="home">Início</button>
+            <button id="tabProposals" class="tab-btn" type="button" data-tab="proposals">Propostas Comerciais</button>
             <button id="tabClients" class="tab-btn" type="button" data-tab="clients">Clientes</button>
             <button id="tabEmployees" class="tab-btn" type="button" data-tab="employees">Funcionários</button>
             <button id="tabPayslip" class="tab-btn" type="button" data-tab="payslip">Contracheque</button>
@@ -95,7 +96,14 @@
     </section>
 
     <main class="layout">
-      <section id="proposalModule" class="module module-active">
+      <section id="homeModule" class="module module-active">
+        <section class="panel home-dashboard-panel">
+          <h2 id="homeGreeting" class="home-greeting">Olá, o que você precisa fazer agora?</h2>
+          <div id="homeModulesGrid" class="home-modules-grid"></div>
+        </section>
+      </section>
+
+      <section id="proposalModule" class="module">
         <section id="proposalEntryGate" class="panel">
           <h2>Iniciar proposta comercial</h2>
           <div class="form-grid">

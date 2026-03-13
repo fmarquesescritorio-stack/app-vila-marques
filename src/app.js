@@ -111,7 +111,7 @@ const state = {
   deletedExportIds: [],
 };
 const uiState = {
-  activeTab: "proposals",
+  activeTab: "home",
   proposalStarted: false,
   proposalStep: 1,
   maxProposalStep: 6,
@@ -260,6 +260,7 @@ const EXPENSE_CATEGORY_LABELS = {
   outros: "Outros",
 };
 const APP_TABS = [
+  "home",
   "proposals",
   "clients",
   "employees",
@@ -271,6 +272,7 @@ const APP_TABS = [
   "exports",
 ];
 const TAB_TO_SLUG = {
+  home: "inicio",
   proposals: "propostas",
   clients: "clientes",
   employees: "funcionarios",
@@ -1452,6 +1454,7 @@ function getUserDisplayNameFromEmail() {
 function canAccessTab(tabName) {
   if (!authState.user) return true;
   const map = {
+    home: null,
     proposals: "accessProposals",
     clients: "accessClients",
     employees: "accessEmployees",
@@ -1504,6 +1507,7 @@ async function loadCurrentUserPermissions() {
 
 function applyPermissionsUi() {
   const tabVisibility = [
+    ["tabHome", null],
     ["tabProposals", "accessProposals"],
     ["tabClients", "accessClients"],
     ["tabEmployees", "accessEmployees"],
@@ -1517,7 +1521,7 @@ function applyPermissionsUi() {
   tabVisibility.forEach(([id, permission]) => {
     const element = document.getElementById(id);
     if (!element) return;
-    element.style.display = hasPermission(permission) ? "" : "none";
+    element.style.display = permission ? (hasPermission(permission) ? "" : "none") : "";
   });
 
   const btnExportProposal = document.getElementById("btnExportPdf");
@@ -1611,13 +1615,13 @@ function normalizePathname(pathname) {
 
 function getTabFromPath(pathname) {
   const normalizedPath = normalizePathname(pathname || window.location.pathname);
-  if (!normalizedPath) return "proposals";
-  return SLUG_TO_TAB[normalizedPath] || "proposals";
+  if (!normalizedPath) return "home";
+  return SLUG_TO_TAB[normalizedPath] || "home";
 }
 
 function getPathForTab(tabName) {
-  const safeTab = APP_TABS.includes(tabName) ? tabName : "proposals";
-  return `/${TAB_TO_SLUG[safeTab] || TAB_TO_SLUG.proposals}`;
+  const safeTab = APP_TABS.includes(tabName) ? tabName : "home";
+  return `/${TAB_TO_SLUG[safeTab] || TAB_TO_SLUG.home}`;
 }
 
 function syncUrlWithTab(tabName, options = {}) {
@@ -1646,7 +1650,7 @@ function toggleSupabaseConfig(forceShow) {
 }
 
 function getRedirectUrl() {
-  const safeTab = canAccessTab(uiState.activeTab) ? uiState.activeTab : "proposals";
+  const safeTab = canAccessTab(uiState.activeTab) ? uiState.activeTab : "home";
   return `${window.location.origin}${getPathForTab(safeTab)}`;
 }
 
@@ -2094,12 +2098,12 @@ function setActiveTab(tabName, options = {}) {
   const previousTab = uiState.activeTab;
   const requestedTab = APP_TABS.includes(tabName)
     ? tabName
-    : "proposals";
+    : "home";
   let nextTab = requestedTab;
   let shouldFixUrlWithFallback = false;
   if (!canAccessTab(nextTab)) {
     setAuthMessage("Você não tem permissão para acessar este módulo.", true);
-    nextTab = "proposals";
+    nextTab = "home";
     shouldFixUrlWithFallback = true;
   }
   if (previousTab && previousTab !== nextTab) {
@@ -2107,6 +2111,7 @@ function setActiveTab(tabName, options = {}) {
   }
   uiState.activeTab = nextTab;
 
+  const homeModule = document.getElementById("homeModule");
   const proposalModule = document.getElementById("proposalModule");
   const clientsModule = document.getElementById("clientsModule");
   const employeesModule = document.getElementById("employeesModule");
@@ -2116,6 +2121,7 @@ function setActiveTab(tabName, options = {}) {
   const contractsModule = document.getElementById("contractsModule");
   const rentedPropertiesModule = document.getElementById("rentedPropertiesModule");
   const exportsModule = document.getElementById("exportsModule");
+  const tabHome = document.getElementById("tabHome");
   const tabProposals = document.getElementById("tabProposals");
   const tabClients = document.getElementById("tabClients");
   const tabEmployees = document.getElementById("tabEmployees");
@@ -2128,6 +2134,7 @@ function setActiveTab(tabName, options = {}) {
   const btnExportProposal = document.getElementById("btnExportPdf");
   const btnExportPayslip = document.getElementById("btnExportPayslipPdf");
 
+  homeModule.classList.toggle("module-active", uiState.activeTab === "home");
   proposalModule.classList.toggle("module-active", uiState.activeTab === "proposals");
   clientsModule.classList.toggle("module-active", uiState.activeTab === "clients");
   employeesModule.classList.toggle("module-active", uiState.activeTab === "employees");
@@ -2137,6 +2144,7 @@ function setActiveTab(tabName, options = {}) {
   contractsModule.classList.toggle("module-active", uiState.activeTab === "contracts");
   rentedPropertiesModule.classList.toggle("module-active", uiState.activeTab === "rentedProperties");
   exportsModule.classList.toggle("module-active", uiState.activeTab === "exports");
+  tabHome.classList.toggle("tab-btn-active", uiState.activeTab === "home");
   tabProposals.classList.toggle("tab-btn-active", uiState.activeTab === "proposals");
   tabClients.classList.toggle("tab-btn-active", uiState.activeTab === "clients");
   tabEmployees.classList.toggle("tab-btn-active", uiState.activeTab === "employees");
@@ -6171,6 +6179,7 @@ function renderAll() {
   setupBRLInputs(document.getElementById("rentedPropertyForm"));
   renderPendingEmployeeDocuments();
   renderProposalPhotosList();
+  renderHomeDashboard();
 
   const contractsForm = document.getElementById("contractsForm");
   if (contractsForm) {
@@ -6213,6 +6222,38 @@ function renderAll() {
   renderRentedPropertiesModule();
   renderExports();
   renderNotifications();
+}
+
+function renderHomeDashboard() {
+  const greeting = document.getElementById("homeGreeting");
+  const grid = document.getElementById("homeModulesGrid");
+  if (!greeting || !grid) return;
+
+  const name = authState.user ? getUserDisplayNameFromEmail() : "usuário";
+  greeting.textContent = `Olá ${name}, o que você precisa fazer agora?`;
+
+  const items = [
+    { tab: "proposals", title: "Propostas Comerciais", description: "Criar, editar e exportar propostas." },
+    { tab: "clients", title: "Clientes", description: "Consultar e gerenciar clientes." },
+    { tab: "employees", title: "Funcionários", description: "Consultar e gerenciar funcionários." },
+    { tab: "payslip", title: "Contracheque", description: "Gerar e exportar contracheques." },
+    { tab: "balance", title: "Balanço", description: "Lançar entradas/saídas e acompanhar resultados." },
+    { tab: "taxes", title: "Impostos", description: "Registrar faturamento, impostos e alíquota." },
+    { tab: "contracts", title: "Contratos", description: "Gerenciar contratos e recebimentos." },
+    { tab: "rentedProperties", title: "Imóveis Alugados", description: "Controlar alugueis e vencimentos." },
+    { tab: "exports", title: "Exportados", description: "Acessar documentos exportados." },
+  ].filter((item) => canAccessTab(item.tab));
+
+  grid.innerHTML = items
+    .map(
+      (item) => `
+      <button type="button" class="home-module-card" data-home-tab="${item.tab}">
+        <strong>${item.title}</strong>
+        <span>${item.description}</span>
+      </button>
+    `,
+    )
+    .join("");
 }
 
 function validatePayslipRequiredFields() {
@@ -6512,6 +6553,10 @@ function bindEvents() {
     renderAll();
   });
 
+  document.getElementById("tabHome").addEventListener("click", () => {
+    setActiveTab("home");
+  });
+
   document.getElementById("tabProposals").addEventListener("click", () => {
     setActiveTab("proposals");
   });
@@ -6551,6 +6596,17 @@ function bindEvents() {
   document.getElementById("tabExports").addEventListener("click", () => {
     setActiveTab("exports");
     renderExports();
+  });
+
+  document.getElementById("homeModulesGrid")?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const card = target.closest("[data-home-tab]");
+    if (!card) return;
+    const nextTab = String(card.getAttribute("data-home-tab") || "");
+    if (!nextTab) return;
+    setActiveTab(nextTab);
+    renderAll();
   });
 
   window.addEventListener("popstate", () => {
