@@ -2899,20 +2899,7 @@ async function exportProposalAsPdfFile(proposalDocNode) {
   if (!proposalDocNode) return false;
   const hasLib = await ensureHtml2PdfBundle();
   if (!hasLib || !window.html2pdf) return false;
-
-  const mount = document.createElement("div");
-  mount.style.position = "fixed";
-  mount.style.left = "-100000px";
-  mount.style.top = "0";
-  mount.style.width = "794px";
-  mount.style.background = "#ffffff";
-  mount.style.zIndex = "-1";
-  mount.style.pointerEvents = "none";
-
-  const clone = proposalDocNode.cloneNode(true);
-  mount.appendChild(clone);
-  document.body.appendChild(mount);
-  await waitForProposalRenderReady(clone);
+  await waitForProposalRenderReady(proposalDocNode);
 
   const proposalNumber = String(state.proposal?.proposalNumber || "").trim();
   const issueDate = String(state.proposal?.issueDate || "").trim();
@@ -2931,13 +2918,11 @@ async function exportProposalAsPdfFile(proposalDocNode) {
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
         pagebreak: { mode: ["css", "legacy"] },
       })
-      .from(mount)
+      .from(proposalDocNode)
       .save();
     return true;
   } catch (_error) {
     return false;
-  } finally {
-    mount.remove();
   }
 }
 
