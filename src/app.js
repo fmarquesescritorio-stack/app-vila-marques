@@ -1811,6 +1811,18 @@ function getAllAvailableExports() {
   return mergeExportRecords(state.exports || [], cloudSyncState.sharedExports || []);
 }
 
+async function syncExportRecordToCloudChannels(exportRecord) {
+  const hasEndpoint = Boolean(getCloudSyncEndpoint());
+  const endpointOk = hasEndpoint ? await syncExportToCloud(exportRecord) : false;
+  const sharedOk = await upsertSharedExportToCloud(exportRecord);
+  const anySuccess = sharedOk || endpointOk;
+  return {
+    anySuccess,
+    endpointOk,
+    sharedOk,
+  };
+}
+
 function registerExport(type) {
   const exportRecord = {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -1849,16 +1861,15 @@ function registerExport(type) {
   });
   renderExports();
 
-  void syncExportToCloud(exportRecord).then((ok) => {
+  void syncExportRecordToCloudChannels(exportRecord).then(async (syncResult) => {
     const idx = state.exports.findIndex((item) => item.id === exportRecord.id);
-    if (idx < 0) return;
-    state.exports[idx].cloudStatus = ok ? "synced" : "failed";
-    saveState();
-    renderExports();
-  });
-  void upsertSharedExportToCloud(exportRecord).then(async (ok) => {
-    if (!ok) return;
-    await loadSharedExportsFromCloud(true);
+    if (idx >= 0) {
+      state.exports[idx].cloudStatus = syncResult.anySuccess ? "synced" : "failed";
+      saveState();
+    }
+    if (syncResult.sharedOk) {
+      await loadSharedExportsFromCloud(true);
+    }
     renderExports();
   });
 }
@@ -8234,15 +8245,13 @@ function bindEvents() {
       if (localIdx >= 0) state.exports[localIdx].cloudStatus = "pending";
       saveState();
       renderExports();
-      void syncExportToCloud(exportRecord).then((ok) => {
+      void syncExportRecordToCloudChannels(exportRecord).then(async (syncResult) => {
         const idx = state.exports.findIndex((entry) => entry.id === exportId);
-        if (idx >= 0) state.exports[idx].cloudStatus = ok ? "synced" : "failed";
+        if (idx >= 0) state.exports[idx].cloudStatus = syncResult.anySuccess ? "synced" : "failed";
         saveState();
-        renderExports();
-      });
-      void upsertSharedExportToCloud(exportRecord).then(async (ok) => {
-        if (!ok) return;
-        await loadSharedExportsFromCloud(true);
+        if (syncResult.sharedOk) {
+          await loadSharedExportsFromCloud(true);
+        }
         renderExports();
       });
       return;
