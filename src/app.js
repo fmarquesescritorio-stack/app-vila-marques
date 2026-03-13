@@ -11,6 +11,8 @@ const OWNER_ADMIN_EMAILS = new Set([
   "lu.priscila@hotmail.com",
 ]);
 const CLOUD_STATE_SYNC_DEBOUNCE_MS = 1200;
+const CLOUD_SHARED_STATE_ID = "global";
+const CLOUD_SHARED_STATE_REFRESH_MS = 12000;
 const LOCAL_TEST_EMAIL = "teste@vila.com";
 const LOCAL_TEST_USERNAME = "teste";
 const LOCAL_TEST_PASSWORD = "teste";
@@ -170,6 +172,8 @@ const cloudSyncState = {
   sharedExportsLoaded: false,
   sharedExportsLoading: false,
   sharedExportsLastSyncAt: 0,
+  sharedStateRefreshTimer: null,
+  sharedStateLastUpdatedAt: 0,
 };
 
 const DEFAULT_APP_PERMISSIONS = {
@@ -1185,17 +1189,21 @@ async function saveCloudStateNow() {
   try {
     const payload = getStateSnapshot();
     const { error } = await authState.client
-      .from("app_user_state")
+      .from("app_shared_state")
       .upsert(
         {
-          user_id: authState.user.id,
+          singleton_id: CLOUD_SHARED_STATE_ID,
           state_data: payload,
+          updated_by: authState.user.id,
+          updated_by_email: String(authState.user.email || "").trim().toLowerCase() || null,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "user_id" },
+        { onConflict: "singleton_id" },
       );
     if (error) {
       console.warn("[cloud-state] Falha ao salvar:", error.message);
+    } else {
+      cloudSyncState.sharedStateLastUpdatedAt = Date.now();
     }
   } catch (error) {
     console.warn("[cloud-state] Erro ao salvar:", error);
@@ -1219,20 +1227,66 @@ function scheduleCloudStateSave() {
   }, CLOUD_STATE_SYNC_DEBOUNCE_MS);
 }
 
+async function fetchSharedStateFromCloud() {
+  if (authState.mode !== "supabase" || !authState.client || !authState.user) return null;
+  const { data, error } = await authState.client
+    .from("app_shared_state")
+    .select("state_data, updated_at")
+    .eq("singleton_id", CLOUD_SHARED_STATE_ID)
+    .maybeSingle();
+  if (error) {
+    console.warn("[cloud-state] Falha ao carregar estado compartilhado:", error.message);
+    return null;
+  }
+  return data || null;
+}
+
+async function refreshStateFromCloudIfNewer(force = false) {
+  if (authState.mode !== "supabase" || !authState.client || !authState.user) return;
+  const data = await fetchSharedStateFromCloud();
+  if (!data) return;
+  const cloudSnapshot = data?.state_data && typeof data.state_data === "object" ? data.state_data : null;
+  if (!cloudSnapshot) return;
+  const cloudSavedAt = getSnapshotSavedAt(cloudSnapshot) || (data?.updated_at ? new Date(data.updated_at) : null);
+  const localRaw = localStorage.getItem(STORAGE_KEY);
+  let localSnapshot = null;
+  try {
+    localSnapshot = localRaw ? JSON.parse(localRaw) : null;
+  } catch {
+    localSnapshot = null;
+  }
+  const localSavedAt = getSnapshotSavedAt(localSnapshot);
+  const cloudTs = cloudSavedAt ? cloudSavedAt.getTime() : 0;
+  const localTs = localSavedAt ? localSavedAt.getTime() : 0;
+  if (!force && cloudTs <= localTs) return;
+  cloudSyncState.suppressSave = true;
+  applyStateSnapshot(cloudSnapshot);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudSnapshot));
+  cloudSyncState.suppressSave = false;
+  cloudSyncState.sharedStateLastUpdatedAt = cloudTs || Date.now();
+  renderAll();
+}
+
+function startSharedStateRefreshTimer() {
+  if (cloudSyncState.sharedStateRefreshTimer) clearInterval(cloudSyncState.sharedStateRefreshTimer);
+  if (authState.mode !== "supabase" || !authState.client || !authState.user) return;
+  cloudSyncState.sharedStateRefreshTimer = setInterval(() => {
+    void refreshStateFromCloudIfNewer(false);
+  }, CLOUD_SHARED_STATE_REFRESH_MS);
+}
+
+function stopSharedStateRefreshTimer() {
+  if (!cloudSyncState.sharedStateRefreshTimer) return;
+  clearInterval(cloudSyncState.sharedStateRefreshTimer);
+  cloudSyncState.sharedStateRefreshTimer = null;
+}
+
 async function syncStateFromCloudOnLogin() {
   if (authState.mode !== "supabase" || !authState.client || !authState.user) return;
   if (cloudSyncState.hasLoadedFromCloud) return;
 
   try {
-    const { data, error } = await authState.client
-      .from("app_user_state")
-      .select("state_data, updated_at")
-      .eq("user_id", authState.user.id)
-      .maybeSingle();
-    if (error) {
-      console.warn("[cloud-state] Falha ao carregar:", error.message);
-      return;
-    }
+    const data = await fetchSharedStateFromCloud();
 
     const localRaw = localStorage.getItem(STORAGE_KEY);
     const localSnapshot = localRaw ? JSON.parse(localRaw) : null;
@@ -1255,7 +1309,9 @@ async function syncStateFromCloudOnLogin() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudSnapshot));
     }
     cloudSyncState.suppressSave = false;
+    cloudSyncState.sharedStateLastUpdatedAt = cloudSavedAt ? cloudSavedAt.getTime() : Date.now();
     cloudSyncState.hasLoadedFromCloud = true;
+    startSharedStateRefreshTimer();
   } catch (error) {
     cloudSyncState.suppressSave = false;
     console.warn("[cloud-state] Erro ao sincronizar:", error);
@@ -1717,6 +1773,7 @@ async function initAuthClient() {
 
   authState.client.auth.onAuthStateChange(async (_event, session) => {
     authState.user = session ? session.user : null;
+    stopSharedStateRefreshTimer();
     cloudSyncState.hasLoadedFromCloud = false;
     cloudSyncState.sharedExportsLoaded = false;
     await loadCurrentUserPermissions();
@@ -6526,6 +6583,7 @@ function bindEvents() {
     if (authState.mode === "supabase" && authState.user) {
       await saveCloudStateNow();
     }
+    stopSharedStateRefreshTimer();
     if (cloudSyncState.saveTimer) clearTimeout(cloudSyncState.saveTimer);
     cloudSyncState.saveTimer = null;
     cloudSyncState.hasLoadedFromCloud = false;
@@ -6534,6 +6592,7 @@ function bindEvents() {
     cloudSyncState.sharedExportsLoaded = false;
     cloudSyncState.sharedExportsLoading = false;
     cloudSyncState.sharedExportsLastSyncAt = 0;
+    cloudSyncState.sharedStateLastUpdatedAt = 0;
     if (authState.client) {
       try {
         await authState.client.auth.signOut();
@@ -6613,6 +6672,16 @@ function bindEvents() {
     const tabFromUrl = getTabFromPath(window.location.pathname);
     setActiveTab(tabFromUrl, { syncUrl: false });
     renderAll();
+  });
+
+  window.addEventListener("focus", () => {
+    void refreshStateFromCloudIfNewer(false);
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      void refreshStateFromCloudIfNewer(false);
+    }
   });
 
   document.getElementById("btnBalanceMonthly").addEventListener("click", () => {

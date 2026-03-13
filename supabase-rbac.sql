@@ -258,6 +258,67 @@ for delete
 using (auth.uid() = user_id);
 
 -- =========================================================
+-- Estado compartilhado do app (todos os módulos em nuvem)
+-- =========================================================
+-- Observação:
+-- - Esta é a persistência principal usada pelo app para compartilhar
+--   dados entre usuários/dispositivos.
+-- - app_user_state permanece como legado.
+
+create table if not exists public.app_shared_state (
+  singleton_id text primary key,
+  state_data jsonb not null default '{}'::jsonb,
+  updated_by uuid references auth.users(id) on delete set null,
+  updated_by_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create or replace function public.touch_app_shared_state_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_touch_app_shared_state_updated_at on public.app_shared_state;
+create trigger trg_touch_app_shared_state_updated_at
+before update on public.app_shared_state
+for each row
+execute procedure public.touch_app_shared_state_updated_at();
+
+alter table public.app_shared_state enable row level security;
+
+-- Todos os usuários autenticados do sistema podem ler o estado compartilhado.
+drop policy if exists app_shared_state_select_authenticated on public.app_shared_state;
+create policy app_shared_state_select_authenticated
+on public.app_shared_state
+for select
+using (auth.role() = 'authenticated');
+
+-- Todos os usuários autenticados podem inserir o registro singleton.
+drop policy if exists app_shared_state_insert_authenticated on public.app_shared_state;
+create policy app_shared_state_insert_authenticated
+on public.app_shared_state
+for insert
+with check (auth.role() = 'authenticated');
+
+-- Todos os usuários autenticados podem atualizar o estado compartilhado.
+drop policy if exists app_shared_state_update_authenticated on public.app_shared_state;
+create policy app_shared_state_update_authenticated
+on public.app_shared_state
+for update
+using (auth.role() = 'authenticated')
+with check (auth.role() = 'authenticated');
+
+insert into public.app_shared_state (singleton_id, state_data)
+values ('global', '{}'::jsonb)
+on conflict (singleton_id) do nothing;
+
+-- =========================================================
 -- Exportados compartilhados entre usuários da empresa
 -- =========================================================
 
