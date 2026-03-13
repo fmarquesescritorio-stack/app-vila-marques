@@ -1177,6 +1177,46 @@ function getSnapshotSavedAt(value) {
   return date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
+function hasStateContent(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return false;
+  const hasArrayContent = (key) => Array.isArray(snapshot[key]) && snapshot[key].length > 0;
+  const hasObjectContent = (key) => (
+    snapshot[key]
+    && typeof snapshot[key] === "object"
+    && Object.values(snapshot[key]).some((value) => {
+      if (value === null || value === undefined) return false;
+      if (Array.isArray(value)) return value.length > 0;
+      if (typeof value === "object") return Object.keys(value).length > 0;
+      if (typeof value === "string") return value.trim().length > 0;
+      if (typeof value === "number") return value !== 0;
+      return Boolean(value);
+    })
+  );
+  return (
+    hasArrayContent("clients")
+    || hasArrayContent("payslipEmployees")
+    || hasArrayContent("contractsPortfolio")
+    || hasArrayContent("rentedProperties")
+    || hasArrayContent("exports")
+    || hasObjectContent("company")
+    || hasObjectContent("property")
+    || hasObjectContent("pricing")
+    || hasObjectContent("proposal")
+    || hasObjectContent("contracts")
+    || (snapshot.balance && Array.isArray(snapshot.balance.entries) && snapshot.balance.entries.length > 0)
+    || (snapshot.taxes && Array.isArray(snapshot.taxes.records) && snapshot.taxes.records.length > 0)
+  );
+}
+
+function getCloudSnapshotSavedAt(snapshot, updatedAtRaw) {
+  const fromSnapshot = getSnapshotSavedAt(snapshot);
+  if (fromSnapshot) return fromSnapshot;
+  if (!hasStateContent(snapshot)) return null;
+  const fromRowUpdatedAt = String(updatedAtRaw || "").trim();
+  const parsed = fromRowUpdatedAt ? new Date(fromRowUpdatedAt) : null;
+  return parsed && !Number.isNaN(parsed.getTime()) ? parsed : null;
+}
+
 async function saveCloudStateNow() {
   if (cloudSyncState.suppressSave) return;
   if (authState.mode !== "supabase" || !authState.client || !authState.user) return;
@@ -1247,7 +1287,7 @@ async function refreshStateFromCloudIfNewer(force = false) {
   if (!data) return;
   const cloudSnapshot = data?.state_data && typeof data.state_data === "object" ? data.state_data : null;
   if (!cloudSnapshot) return;
-  const cloudSavedAt = getSnapshotSavedAt(cloudSnapshot) || (data?.updated_at ? new Date(data.updated_at) : null);
+  const cloudSavedAt = getCloudSnapshotSavedAt(cloudSnapshot, data?.updated_at);
   const localRaw = localStorage.getItem(STORAGE_KEY);
   let localSnapshot = null;
   try {
@@ -1256,6 +1296,9 @@ async function refreshStateFromCloudIfNewer(force = false) {
     localSnapshot = null;
   }
   const localSavedAt = getSnapshotSavedAt(localSnapshot);
+  const cloudHasContent = hasStateContent(cloudSnapshot);
+  const localHasContent = hasStateContent(localSnapshot);
+  if (!cloudHasContent && localHasContent && !force) return;
   const cloudTs = cloudSavedAt ? cloudSavedAt.getTime() : 0;
   const localTs = localSavedAt ? localSavedAt.getTime() : 0;
   if (!force && cloudTs <= localTs) return;
@@ -1292,10 +1335,16 @@ async function syncStateFromCloudOnLogin() {
     const localSnapshot = localRaw ? JSON.parse(localRaw) : null;
     const localSavedAt = getSnapshotSavedAt(localSnapshot);
     const cloudSnapshot = data?.state_data && typeof data.state_data === "object" ? data.state_data : null;
-    const cloudSavedAt = getSnapshotSavedAt(cloudSnapshot) || (data?.updated_at ? new Date(data.updated_at) : null);
+    const cloudSavedAt = getCloudSnapshotSavedAt(cloudSnapshot, data?.updated_at);
+    const cloudHasContent = hasStateContent(cloudSnapshot);
+    const localHasContent = hasStateContent(localSnapshot);
 
     cloudSyncState.suppressSave = true;
-    if (cloudSnapshot && (!localSavedAt || (cloudSavedAt && cloudSavedAt > localSavedAt))) {
+    if (
+      cloudSnapshot
+      && (cloudHasContent || !localHasContent)
+      && (!localSavedAt || (cloudSavedAt && cloudSavedAt > localSavedAt))
+    ) {
       applyStateSnapshot(cloudSnapshot);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudSnapshot));
     } else if (localSnapshot) {
