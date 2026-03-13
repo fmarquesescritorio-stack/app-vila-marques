@@ -259,6 +259,32 @@ const EXPENSE_CATEGORY_LABELS = {
   internet: "Internet",
   outros: "Outros",
 };
+const APP_TABS = [
+  "proposals",
+  "clients",
+  "employees",
+  "payslip",
+  "balance",
+  "taxes",
+  "contracts",
+  "rentedProperties",
+  "exports",
+];
+const TAB_TO_SLUG = {
+  proposals: "propostas",
+  clients: "clientes",
+  employees: "funcionarios",
+  payslip: "contracheque",
+  balance: "balanco",
+  taxes: "impostos",
+  contracts: "contratos",
+  rentedProperties: "imoveis-alugados",
+  exports: "exportados",
+};
+const SLUG_TO_TAB = Object.entries(TAB_TO_SLUG).reduce((acc, [tab, slug]) => {
+  acc[slug] = tab;
+  return acc;
+}, {});
 
 function createEmptyContract() {
   return {
@@ -1424,6 +1450,7 @@ function getUserDisplayNameFromEmail() {
 }
 
 function canAccessTab(tabName) {
+  if (!authState.user) return true;
   const map = {
     proposals: "accessProposals",
     clients: "accessClients",
@@ -1575,6 +1602,36 @@ function setModulesMenuOpen(isOpen) {
   menu.classList.toggle("modules-menu-hidden", !isOpen);
 }
 
+function normalizePathname(pathname) {
+  return String(pathname || "")
+    .trim()
+    .replace(/^\/+|\/+$/g, "")
+    .toLowerCase();
+}
+
+function getTabFromPath(pathname) {
+  const normalizedPath = normalizePathname(pathname || window.location.pathname);
+  if (!normalizedPath) return "proposals";
+  return SLUG_TO_TAB[normalizedPath] || "proposals";
+}
+
+function getPathForTab(tabName) {
+  const safeTab = APP_TABS.includes(tabName) ? tabName : "proposals";
+  return `/${TAB_TO_SLUG[safeTab] || TAB_TO_SLUG.proposals}`;
+}
+
+function syncUrlWithTab(tabName, options = {}) {
+  const { replace = false } = options;
+  const nextPath = getPathForTab(tabName);
+  const currentPath = window.location.pathname || "/";
+  if (currentPath === nextPath) return;
+  if (replace) {
+    window.history.replaceState({ tab: tabName }, "", nextPath);
+    return;
+  }
+  window.history.pushState({ tab: tabName }, "", nextPath);
+}
+
 function toggleSupabaseConfig(forceShow) {
   const form = document.getElementById("authConfigForm");
   if (!form) return;
@@ -1589,7 +1646,8 @@ function toggleSupabaseConfig(forceShow) {
 }
 
 function getRedirectUrl() {
-  return `${window.location.origin}${window.location.pathname}`;
+  const safeTab = canAccessTab(uiState.activeTab) ? uiState.activeTab : "proposals";
+  return `${window.location.origin}${getPathForTab(safeTab)}`;
 }
 
 async function initAuthClient() {
@@ -1661,6 +1719,7 @@ async function initAuthClient() {
     if (authState.user) {
       await syncStateFromCloudOnLogin();
       await loadSharedExportsFromCloud(true);
+      setActiveTab(getTabFromPath(window.location.pathname), { replaceUrl: true });
     }
     showAppShell(Boolean(authState.user));
     renderAll();
@@ -1681,6 +1740,7 @@ async function initAuthClient() {
   } else {
     await syncStateFromCloudOnLogin();
     await loadSharedExportsFromCloud(true);
+    setActiveTab(getTabFromPath(window.location.pathname), { replaceUrl: true });
   }
   renderAll();
 }
@@ -2029,14 +2089,18 @@ function resetModuleUiState(moduleName) {
   }
 }
 
-function setActiveTab(tabName) {
+function setActiveTab(tabName, options = {}) {
+  const { syncUrl = true, replaceUrl = false } = options;
   const previousTab = uiState.activeTab;
-  let nextTab = ["proposals", "clients", "employees", "payslip", "balance", "taxes", "contracts", "rentedProperties", "exports"].includes(tabName)
+  const requestedTab = APP_TABS.includes(tabName)
     ? tabName
     : "proposals";
+  let nextTab = requestedTab;
+  let shouldFixUrlWithFallback = false;
   if (!canAccessTab(nextTab)) {
     setAuthMessage("Você não tem permissão para acessar este módulo.", true);
     nextTab = "proposals";
+    shouldFixUrlWithFallback = true;
   }
   if (previousTab && previousTab !== nextTab) {
     resetModuleUiState(previousTab);
@@ -2088,6 +2152,9 @@ function setActiveTab(tabName) {
   uiState.notificationsOpen = false;
   setModulesMenuOpen(false);
   applyPermissionsUi();
+  if (syncUrl || shouldFixUrlWithFallback) {
+    syncUrlWithTab(nextTab, { replace: replaceUrl || shouldFixUrlWithFallback });
+  }
   if (uiState.activeTab === "exports" && authState.mode === "supabase" && authState.user) {
     void loadSharedExportsFromCloud(true).then(() => {
       renderExports();
@@ -6486,6 +6553,12 @@ function bindEvents() {
     renderExports();
   });
 
+  window.addEventListener("popstate", () => {
+    const tabFromUrl = getTabFromPath(window.location.pathname);
+    setActiveTab(tabFromUrl, { syncUrl: false });
+    renderAll();
+  });
+
   document.getElementById("btnBalanceMonthly").addEventListener("click", () => {
     uiState.balanceMode = "monthly";
     renderBalance();
@@ -6632,7 +6705,7 @@ function bindEvents() {
     renderAll();
   });
 
-  setActiveTab("proposals");
+  setActiveTab(getTabFromPath(window.location.pathname), { replaceUrl: true });
   uiState.proposalStarted = false;
   setProposalStep(1);
   renderProposalEntryGate();
