@@ -10,7 +10,8 @@
     {
       "src": "^/(inicio|propostas|clientes|funcionarios|contracheque|balanco|impostos|contratos|imoveis-alugados|exportados)(?:/.*)?$",
       "dest": "/index.html"
-    }
+    },
+    { "src": "^(.*)$", "dest": "/index.html" }
   ],
   "headers": [
     {
