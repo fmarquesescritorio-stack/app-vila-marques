@@ -1171,6 +1171,11 @@ function saveState() {
   scheduleCloudStateSave();
 }
 
+async function saveStateAndCloudNow() {
+  saveState();
+  await saveCloudStateNow();
+}
+
 function getSnapshotSavedAt(value) {
   const raw = String(value?.savedAt || "").trim();
   const date = raw ? new Date(raw) : null;
@@ -3940,11 +3945,11 @@ function buildBalanceMonthlyForecast(year, monthNumber) {
   };
 }
 
-function removeBalanceEntryById(id) {
+async function removeBalanceEntryById(id) {
   const index = state.balance.entries.findIndex((entry) => entry.id === id);
   if (index >= 0) {
     state.balance.entries.splice(index, 1);
-    saveState();
+    await saveStateAndCloudNow();
     renderBalance();
   }
 }
@@ -4541,7 +4546,7 @@ function renderBalance() {
 
   document.querySelectorAll(".btn-remove-balance").forEach((button) => {
     button.addEventListener("click", () => {
-      removeBalanceEntryById(button.getAttribute("data-balance-id"));
+      void removeBalanceEntryById(button.getAttribute("data-balance-id"));
     });
   });
 }
@@ -6914,7 +6919,7 @@ function bindEvents() {
     });
   }
 
-  document.getElementById("taxesList")?.addEventListener("click", (event) => {
+  document.getElementById("taxesList")?.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     const button = target.closest("button[data-action]");
@@ -6938,7 +6943,7 @@ function bindEvents() {
         (entry) => String(entry.linkedTaxRecordId || "") !== taxId,
       );
       if (uiState.editingTaxRecordId === taxId) clearTaxesForm();
-      saveState();
+      await saveStateAndCloudNow();
       renderAll();
     }
   });
@@ -7109,7 +7114,7 @@ function bindEvents() {
     alert("Cliente salvo com sucesso.");
   });
 
-  document.getElementById("clientCatalogList").addEventListener("click", (event) => {
+  document.getElementById("clientCatalogList").addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     const button = target.closest("button[data-action]");
@@ -7157,7 +7162,7 @@ function bindEvents() {
         contract.clientId === client.id ? { ...contract, clientId: "" } : contract
       ));
       if (state.contracts.clientId === client.id) state.contracts.clientId = "";
-      saveState();
+      await saveStateAndCloudNow();
       void logAuditAction({
         action: "delete",
         module: "clients",
@@ -7525,7 +7530,7 @@ function bindEvents() {
     alert("Funcionário salvo com sucesso.");
   });
 
-  document.getElementById("employeeCatalogList").addEventListener("click", (event) => {
+  document.getElementById("employeeCatalogList").addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     const button = target.closest("button[data-action]");
@@ -7579,7 +7584,7 @@ function bindEvents() {
       if (state.payslip.selectedEmployeeId === employee.id) {
         state.payslip.selectedEmployeeId = "";
       }
-      saveState();
+      await saveStateAndCloudNow();
       void logAuditAction({
         action: "delete",
         module: "employees",
@@ -8049,7 +8054,7 @@ function bindEvents() {
     renderContracts();
   });
 
-  document.getElementById("contractsSavedList").addEventListener("click", (event) => {
+  document.getElementById("contractsSavedList").addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     const button = target.closest("button[data-action]");
@@ -8103,7 +8108,7 @@ function bindEvents() {
       if (state.activeContractId === contractId) {
         resetContractsDraftForm(true);
       }
-      saveState();
+      await saveStateAndCloudNow();
       void logAuditAction({
         action: "delete",
         module: "contracts",
@@ -8223,7 +8228,7 @@ function bindEvents() {
     copyAddressFromContractToRentedPropertyForm(contractId);
   });
 
-  document.getElementById("rentedPropertiesSavedList").addEventListener("click", (event) => {
+  document.getElementById("rentedPropertiesSavedList").addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     const button = target.closest("button[data-action]");
@@ -8327,7 +8332,7 @@ function bindEvents() {
       if (String(state.contracts.rentedPropertyId || "") === property.id) {
         state.contracts.rentedPropertyId = "";
       }
-      saveState();
+      await saveStateAndCloudNow();
       void logAuditAction({
         action: "delete",
         module: "rented_properties",
@@ -8574,7 +8579,7 @@ function bindEvents() {
     renderExports();
   });
 
-  document.getElementById("exportsList").addEventListener("click", (event) => {
+  document.getElementById("exportsList").addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     const button = target.closest("button[data-action]");
@@ -8625,16 +8630,14 @@ function bindEvents() {
       cloudSyncState.sharedExports = (cloudSyncState.sharedExports || []).filter((entry) => entry.id !== exportId);
       if (!Array.isArray(state.deletedExportIds)) state.deletedExportIds = [];
       if (!state.deletedExportIds.includes(exportId)) state.deletedExportIds.push(exportId);
-      saveState();
-      void deleteSharedExportFromCloud(exportId).then(async (ok) => {
-        if (!ok && authState.mode === "supabase") {
-          alert("Não foi possível apagar este exportado na nuvem. Verifique permissões do usuário.");
-        }
-        if (authState.mode === "supabase" && authState.user) {
-          await loadSharedExportsFromCloud(true);
-          renderExports();
-        }
-      });
+      await saveStateAndCloudNow();
+      const ok = await deleteSharedExportFromCloud(exportId);
+      if (!ok && authState.mode === "supabase") {
+        alert("Não foi possível apagar este exportado na nuvem. Verifique permissões do usuário.");
+      }
+      if (authState.mode === "supabase" && authState.user) {
+        await loadSharedExportsFromCloud(true);
+      }
       void logAuditAction({
         action: "delete",
         module: "exports",
@@ -8644,6 +8647,15 @@ function bindEvents() {
         before: exportRecord,
       });
       renderExports();
+    }
+  });
+
+  window.addEventListener("pagehide", () => {
+    void saveCloudStateNow();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      void saveCloudStateNow();
     }
   });
 
