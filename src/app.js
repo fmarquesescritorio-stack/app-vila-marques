@@ -1971,6 +1971,14 @@ async function loadSharedExportsFromCloud(force = false) {
       cloudStatus: "synced",
       createdByEmail: entry.created_by_email,
     }));
+    const cloudIds = new Set(cloudSyncState.sharedExports.map((entry) => String(entry.id || "").trim()).filter(Boolean));
+    state.exports = (state.exports || []).filter((entry) => {
+      const id = String(entry?.id || "").trim();
+      if (!id) return false;
+      const status = String(entry?.cloudStatus || "").trim().toLowerCase();
+      if (status === "pending" || status === "failed") return true;
+      return cloudIds.has(id);
+    });
     cloudSyncState.sharedExportsLoaded = true;
     cloudSyncState.sharedExportsLastSyncAt = Date.now();
   } catch {
@@ -2026,7 +2034,19 @@ function mergeExportRecords(primaryList, secondaryList) {
 
 function getAllAvailableExports() {
   const deletedSet = new Set((state.deletedExportIds || []).map((id) => String(id || "").trim()).filter(Boolean));
-  const merged = mergeExportRecords(state.exports || [], cloudSyncState.sharedExports || []);
+  const isSharedCloudActive = authState.mode === "supabase" && !!authState.user;
+  let merged;
+  if (isSharedCloudActive) {
+    // In Supabase mode, cloud is the source of truth for synced records.
+    // Keep only local exports that are still pending/failed to avoid stale ghosts after remote deletion.
+    const localUnsynced = (state.exports || []).filter((entry) => {
+      const status = String(entry?.cloudStatus || "").trim().toLowerCase();
+      return status === "pending" || status === "failed";
+    });
+    merged = mergeExportRecords(cloudSyncState.sharedExports || [], localUnsynced);
+  } else {
+    merged = mergeExportRecords(state.exports || [], cloudSyncState.sharedExports || []);
+  }
   if (!deletedSet.size) return merged;
   return merged.filter((entry) => !deletedSet.has(String(entry.id || "")));
 }
