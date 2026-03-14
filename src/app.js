@@ -10,7 +10,7 @@ const OWNER_ADMIN_EMAILS = new Set([
   "fmarquesescritorio@gmail.com",
   "lu.priscila@hotmail.com",
 ]);
-const CLOUD_STATE_SYNC_DEBOUNCE_MS = 1200;
+const CLOUD_STATE_SYNC_DEBOUNCE_MS = 0;
 const CLOUD_SHARED_STATE_ID = "global";
 const CLOUD_SHARED_STATE_REFRESH_MS = 12000;
 const LOCAL_TEST_EMAIL = "teste@vila.com";
@@ -174,6 +174,8 @@ const cloudSyncState = {
   sharedExportsLastSyncAt: 0,
   sharedStateRefreshTimer: null,
   sharedStateLastUpdatedAt: 0,
+  sharedStateRealtimeChannel: null,
+  sharedExportsRealtimeChannel: null,
 };
 
 const DEFAULT_APP_PERMISSIONS = {
@@ -1344,6 +1346,62 @@ function stopSharedStateRefreshTimer() {
   cloudSyncState.sharedStateRefreshTimer = null;
 }
 
+function stopRealtimeSubscriptions() {
+  if (!authState.client) return;
+  try {
+    if (cloudSyncState.sharedStateRealtimeChannel) {
+      authState.client.removeChannel(cloudSyncState.sharedStateRealtimeChannel);
+      cloudSyncState.sharedStateRealtimeChannel = null;
+    }
+    if (cloudSyncState.sharedExportsRealtimeChannel) {
+      authState.client.removeChannel(cloudSyncState.sharedExportsRealtimeChannel);
+      cloudSyncState.sharedExportsRealtimeChannel = null;
+    }
+  } catch (error) {
+    console.warn("[realtime] Falha ao encerrar canais:", error);
+  }
+}
+
+function startRealtimeSubscriptions() {
+  if (authState.mode !== "supabase" || !authState.client || !authState.user) return;
+  stopRealtimeSubscriptions();
+
+  const stateChannelName = `vm-shared-state-${authState.user.id}-${Date.now()}`;
+  cloudSyncState.sharedStateRealtimeChannel = authState.client
+    .channel(stateChannelName)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "app_shared_state",
+        filter: `singleton_id=eq.${CLOUD_SHARED_STATE_ID}`,
+      },
+      () => {
+        void refreshStateFromCloudIfNewer(false);
+      },
+    )
+    .subscribe();
+
+  const exportsChannelName = `vm-shared-exports-${authState.user.id}-${Date.now()}`;
+  cloudSyncState.sharedExportsRealtimeChannel = authState.client
+    .channel(exportsChannelName)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "app_shared_exports",
+      },
+      () => {
+        void loadSharedExportsFromCloud(true).then(() => {
+          renderExports();
+        });
+      },
+    )
+    .subscribe();
+}
+
 async function syncStateFromCloudOnLogin() {
   if (authState.mode !== "supabase" || !authState.client || !authState.user) return;
   if (cloudSyncState.hasLoadedFromCloud) return;
@@ -1875,6 +1933,7 @@ async function initAuthClient() {
 
   authState.client.auth.onAuthStateChange(async (_event, session) => {
     authState.user = session ? session.user : null;
+    stopRealtimeSubscriptions();
     stopSharedStateRefreshTimer();
     cloudSyncState.hasLoadedFromCloud = false;
     cloudSyncState.sharedExportsLoaded = false;
@@ -1882,6 +1941,7 @@ async function initAuthClient() {
     if (authState.user) {
       await syncStateFromCloudOnLogin();
       await loadSharedExportsFromCloud(true);
+      startRealtimeSubscriptions();
       setActiveTab(getTabFromLocation(), { replaceUrl: true });
     }
     showAppShell(Boolean(authState.user));
@@ -1903,6 +1963,7 @@ async function initAuthClient() {
   } else {
     await syncStateFromCloudOnLogin();
     await loadSharedExportsFromCloud(true);
+    startRealtimeSubscriptions();
     setActiveTab(getTabFromLocation(), { replaceUrl: true });
   }
   renderAll();
@@ -6735,6 +6796,7 @@ function bindEvents() {
       await saveCloudStateNow();
     }
     stopSharedStateRefreshTimer();
+    stopRealtimeSubscriptions();
     if (cloudSyncState.saveTimer) clearTimeout(cloudSyncState.saveTimer);
     cloudSyncState.saveTimer = null;
     cloudSyncState.hasLoadedFromCloud = false;
