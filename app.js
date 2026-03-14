@@ -2043,7 +2043,7 @@ async function syncExportRecordToCloudChannels(exportRecord) {
   };
 }
 
-function registerExport(type) {
+async function registerExport(type) {
   const exportRecord = {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     type,
@@ -2068,6 +2068,7 @@ function registerExport(type) {
   state.deletedExportIds = (state.deletedExportIds || []).filter((id) => String(id || "").trim() !== exportRecord.id);
   state.exports = [exportRecord, ...(state.exports || [])].slice(0, 500);
   saveState();
+  await saveCloudStateNow();
   void logAuditAction({
     action: "export",
     module: "exports",
@@ -2082,17 +2083,16 @@ function registerExport(type) {
   });
   renderExports();
 
-  void syncExportRecordToCloudChannels(exportRecord).then(async (syncResult) => {
-    const idx = state.exports.findIndex((item) => item.id === exportRecord.id);
-    if (idx >= 0) {
-      state.exports[idx].cloudStatus = syncResult.anySuccess ? "synced" : "failed";
-      saveState();
-    }
-    if (syncResult.sharedOk) {
-      await loadSharedExportsFromCloud(true);
-    }
-    renderExports();
-  });
+  const syncResult = await syncExportRecordToCloudChannels(exportRecord);
+  const idx = state.exports.findIndex((item) => item.id === exportRecord.id);
+  if (idx >= 0) {
+    state.exports[idx].cloudStatus = syncResult.anySuccess ? "synced" : "failed";
+    saveState();
+  }
+  if (syncResult.sharedOk) {
+    await loadSharedExportsFromCloud(true);
+  }
+  renderExports();
 }
 
 function resetActiveTabInputs() {
@@ -8424,13 +8424,13 @@ function bindEvents() {
     await waitForProposalRenderReady(proposalDoc);
     const downloaded = await exportProposalAsPdfFile(proposalDoc);
     if (downloaded) {
-      registerExport("proposal");
+      await registerExport("proposal");
     } else {
       const ok = printHtmlContent({
         title: "Proposta Comercial",
         contentHtml: `<section class="panel proposal">${proposalDoc.outerHTML}</section>`,
       });
-      if (ok) registerExport("proposal");
+      if (ok) await registerExport("proposal");
       else alert("Não foi possível exportar em PDF. Tente novamente.");
     }
     if (exportBtn) {
@@ -8466,7 +8466,7 @@ function bindEvents() {
     await waitForProposalRenderReady(payslipSheet);
     const downloaded = await exportPayslipAsPdfFile(payslipSheet);
     if (downloaded) {
-      registerExport("payslip");
+      await registerExport("payslip");
     } else {
       const payslipOutput = document.getElementById("payslipOutput");
       const payslipHtml = payslipOutput?.innerHTML || "";
@@ -8475,7 +8475,7 @@ function bindEvents() {
         bodyClass: "print-payslip",
         contentHtml: `<section id="payslipModule" class="module module-active"><section class="panel payslip-builder"><div class="payslip-output">${payslipHtml}</div></section></section>`,
       });
-      if (ok) registerExport("payslip");
+      if (ok) await registerExport("payslip");
       else alert("Não foi possível exportar o contracheque em PDF.");
     }
     window.setTimeout(() => {
