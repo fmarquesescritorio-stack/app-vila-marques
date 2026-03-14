@@ -1369,17 +1369,26 @@ async function syncStateFromCloudOnLogin() {
     const localHasContent = hasStateContent(localSnapshot);
 
     cloudSyncState.suppressSave = true;
+    const mustPreferCloudBecauseLocalIsEmpty = cloudHasContent && !localHasContent;
     if (
       cloudSnapshot
       && (cloudHasContent || !localHasContent)
-      && (!localSavedAt || (cloudSavedAt && cloudSavedAt > localSavedAt))
+      && (
+        mustPreferCloudBecauseLocalIsEmpty
+        || !localSavedAt
+        || (cloudSavedAt && cloudSavedAt > localSavedAt)
+      )
     ) {
       applyStateSnapshot(cloudSnapshot);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudSnapshot));
     } else if (localSnapshot) {
       applyStateSnapshot(localSnapshot);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(localSnapshot));
-      if (!cloudSnapshot || (localSavedAt && (!cloudSavedAt || localSavedAt > cloudSavedAt))) {
+      const canUploadLocalOverCloud = localHasContent || !cloudHasContent;
+      if (
+        canUploadLocalOverCloud
+        && (!cloudSnapshot || (localSavedAt && (!cloudSavedAt || localSavedAt > cloudSavedAt)))
+      ) {
         shouldUploadLocalSnapshot = true;
       }
     } else if (cloudSnapshot) {
