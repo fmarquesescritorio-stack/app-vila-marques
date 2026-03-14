@@ -1344,6 +1344,7 @@ async function syncStateFromCloudOnLogin() {
   if (cloudSyncState.hasLoadedFromCloud) return;
 
   try {
+    let shouldUploadLocalSnapshot = false;
     let data = await fetchSharedStateFromCloud();
     const cloudSnapshotInitial = data?.state_data && typeof data.state_data === "object" ? data.state_data : null;
     if (!hasStateContent(cloudSnapshotInitial)) {
@@ -1379,7 +1380,7 @@ async function syncStateFromCloudOnLogin() {
       applyStateSnapshot(localSnapshot);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(localSnapshot));
       if (!cloudSnapshot || (localSavedAt && (!cloudSavedAt || localSavedAt > cloudSavedAt))) {
-        await saveCloudStateNow();
+        shouldUploadLocalSnapshot = true;
       }
     } else if (cloudSnapshot) {
       applyStateSnapshot(cloudSnapshot);
@@ -1388,6 +1389,9 @@ async function syncStateFromCloudOnLogin() {
     cloudSyncState.suppressSave = false;
     cloudSyncState.sharedStateLastUpdatedAt = cloudSavedAt ? cloudSavedAt.getTime() : Date.now();
     cloudSyncState.hasLoadedFromCloud = true;
+    if (shouldUploadLocalSnapshot) {
+      await saveCloudStateNow();
+    }
     startSharedStateRefreshTimer();
   } catch (error) {
     cloudSyncState.suppressSave = false;
