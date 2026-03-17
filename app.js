@@ -4,8 +4,8 @@ const SUPABASE_URL_KEY = "vm-supabase-url";
 const SUPABASE_ANON_KEY = "vm-supabase-anon-key";
 const AUTH_CONFIG_LOCK_KEY = "vm-auth-config-locked";
 const LOCAL_TEST_SESSION_KEY = "vm-local-test-session";
-const DEFAULT_SUPABASE_URL = "https://ohrjghkdrwqslvdtcleo.supabase.co";
-const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_toVTnlfbkYpprefiRvfo1w_BbwyrdKO";
+const DEFAULT_SUPABASE_URL = "https://tyyikeewyzysikngjior.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_b2GWLZESqIVkljASGuYaUw_Uiotdk6f";
 const OWNER_ADMIN_EMAILS = new Set([
   "fmarquesescritorio@gmail.com",
   "lu.priscila@hotmail.com",
