@@ -1334,16 +1334,20 @@ async function refreshStateFromCloudIfNewer(force = false) {
   }
   const cloudHasContent = hasStateContent(cloudSnapshot);
   const localHasContent = hasStateContent(localSnapshot);
+  const localSavedAt = getSnapshotSavedAt(localSnapshot);
   if (!cloudHasContent && localHasContent && !force) return;
   if (!cloudHasContent && !force) return;
   const cloudTs = cloudSavedAt ? cloudSavedAt.getTime() : 0;
+  const localTs = localSavedAt ? localSavedAt.getTime() : 0;
   if (!force) {
     if (cloudSyncState.sharedStateLastUpdatedAt && cloudTs && cloudTs <= cloudSyncState.sharedStateLastUpdatedAt) {
       return;
     }
-    if (cloudSyncState.localDirtySince && (Date.now() - cloudSyncState.localDirtySince) < 5000) {
+    if (cloudSyncState.localDirtySince) {
+      void saveCloudStateNow();
       return;
     }
+    if (localHasContent && localTs && cloudTs && cloudTs < localTs) return;
   }
   cloudSyncState.suppressSave = true;
   applyStateSnapshot(cloudSnapshot);
@@ -1454,11 +1458,19 @@ async function syncStateFromCloudOnLogin() {
     }
     const cloudSnapshot = data?.state_data && typeof data.state_data === "object" ? data.state_data : null;
     const cloudSavedAt = getCloudSnapshotSavedAt(cloudSnapshot, data?.updated_at);
+    const localSavedAt = getSnapshotSavedAt(localSnapshot);
     const cloudHasContent = hasStateContent(cloudSnapshot);
     const localHasContent = hasStateContent(localSnapshot);
+    const cloudTs = cloudSavedAt ? cloudSavedAt.getTime() : 0;
+    const localTs = localSavedAt ? localSavedAt.getTime() : 0;
+    const preferLocal = localHasContent && (!cloudHasContent || (localTs && cloudTs && localTs > cloudTs));
 
     cloudSyncState.suppressSave = true;
-    if (cloudSnapshot && cloudHasContent) {
+    if (preferLocal && localSnapshot) {
+      applyStateSnapshot(localSnapshot);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(localSnapshot));
+      shouldUploadLocalSnapshot = true;
+    } else if (cloudSnapshot && cloudHasContent) {
       applyStateSnapshot(cloudSnapshot);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudSnapshot));
     } else if (localSnapshot && localHasContent) {
