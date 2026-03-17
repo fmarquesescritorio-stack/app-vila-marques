@@ -1172,6 +1172,17 @@ function normalizeStatePatterns() {
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(getStateSnapshot()));
   cloudSyncState.localDirtySince = Date.now();
+  const canSyncNow = (
+    authState.mode === "supabase"
+    && !!authState.client
+    && !!authState.user
+    && cloudSyncState.hasLoadedFromCloud
+  );
+  if (canSyncNow) {
+    void saveCloudStateNow();
+    scheduleCloudStateSave();
+    return;
+  }
   scheduleCloudStateSave();
 }
 
@@ -6174,7 +6185,7 @@ function renderContracts() {
   }
   const btnMarkReceiptPaid = document.getElementById("btnMarkCurrentReceiptPaid");
   if (btnMarkReceiptPaid) {
-    btnMarkReceiptPaid.onclick = () => {
+    btnMarkReceiptPaid.onclick = async () => {
       if (!hasPermission("editContracts")) {
         alert("Sem permissão para registrar pagamentos de contrato.");
         return;
@@ -6227,7 +6238,7 @@ function renderContracts() {
         };
         state.balance.entries.push(incomeEntry);
       }
-      saveState();
+      await saveStateAndCloudNow();
       void logAuditAction({
         action: "mark_paid",
         module: "contracts",
@@ -7995,7 +8006,7 @@ function bindEvents() {
           salaryHistory,
         };
       }
-      saveState();
+      await saveStateAndCloudNow();
       void logAuditAction({
         action: "create",
         module: "balance",
