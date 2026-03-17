@@ -1317,13 +1317,11 @@ async function refreshStateFromCloudIfNewer(force = false) {
   } catch {
     localSnapshot = null;
   }
-  const localSavedAt = getSnapshotSavedAt(localSnapshot);
   const cloudHasContent = hasStateContent(cloudSnapshot);
   const localHasContent = hasStateContent(localSnapshot);
   if (!cloudHasContent && localHasContent && !force) return;
+  if (!cloudHasContent && !force) return;
   const cloudTs = cloudSavedAt ? cloudSavedAt.getTime() : 0;
-  const localTs = localSavedAt ? localSavedAt.getTime() : 0;
-  if (!force && cloudTs <= localTs) return;
   cloudSyncState.suppressSave = true;
   applyStateSnapshot(cloudSnapshot);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudSnapshot));
@@ -1425,38 +1423,25 @@ async function syncStateFromCloudOnLogin() {
 
     const localRaw = localStorage.getItem(STORAGE_KEY);
     const localSnapshot = localRaw ? JSON.parse(localRaw) : null;
-    const localSavedAt = getSnapshotSavedAt(localSnapshot);
     const cloudSnapshot = data?.state_data && typeof data.state_data === "object" ? data.state_data : null;
     const cloudSavedAt = getCloudSnapshotSavedAt(cloudSnapshot, data?.updated_at);
     const cloudHasContent = hasStateContent(cloudSnapshot);
     const localHasContent = hasStateContent(localSnapshot);
 
     cloudSyncState.suppressSave = true;
-    const mustPreferCloudBecauseLocalIsEmpty = cloudHasContent && !localHasContent;
-    if (
-      cloudSnapshot
-      && (cloudHasContent || !localHasContent)
-      && (
-        mustPreferCloudBecauseLocalIsEmpty
-        || !localSavedAt
-        || (cloudSavedAt && cloudSavedAt > localSavedAt)
-      )
-    ) {
+    if (cloudSnapshot && cloudHasContent) {
+      applyStateSnapshot(cloudSnapshot);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudSnapshot));
+    } else if (localSnapshot && localHasContent) {
+      applyStateSnapshot(localSnapshot);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(localSnapshot));
+      shouldUploadLocalSnapshot = true;
+    } else if (cloudSnapshot) {
       applyStateSnapshot(cloudSnapshot);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudSnapshot));
     } else if (localSnapshot) {
       applyStateSnapshot(localSnapshot);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(localSnapshot));
-      const canUploadLocalOverCloud = localHasContent || !cloudHasContent;
-      if (
-        canUploadLocalOverCloud
-        && (!cloudSnapshot || (localSavedAt && (!cloudSavedAt || localSavedAt > cloudSavedAt)))
-      ) {
-        shouldUploadLocalSnapshot = true;
-      }
-    } else if (cloudSnapshot) {
-      applyStateSnapshot(cloudSnapshot);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudSnapshot));
     }
     cloudSyncState.suppressSave = false;
     cloudSyncState.sharedStateLastUpdatedAt = cloudSavedAt ? cloudSavedAt.getTime() : Date.now();
