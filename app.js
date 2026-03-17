@@ -6806,33 +6806,54 @@ function bindEvents() {
   if (loginForm) {
     loginForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const data = formToObject(event.currentTarget);
-      if (ALLOW_LOCAL_TEST_LOGIN && isLocalTestCredential(data.email, data.password)) {
-        setLocalTestSession(true);
-        authState.mode = "local";
-        authState.user = { email: LOCAL_TEST_EMAIL };
-        await loadCurrentUserPermissions();
-        showAppShell(true);
-        setAuthMessage("Login de teste realizado.");
-        renderAll();
-        return;
+      try {
+        const data = formToObject(event.currentTarget);
+        if (ALLOW_LOCAL_TEST_LOGIN && isLocalTestCredential(data.email, data.password)) {
+          setLocalTestSession(true);
+          authState.mode = "local";
+          authState.user = { email: LOCAL_TEST_EMAIL };
+          await loadCurrentUserPermissions();
+          showAppShell(true);
+          setAuthMessage("Login de teste realizado.");
+          renderAll();
+          return;
+        }
+        if (!authState.client) {
+          await initAuthClient();
+        }
+        if (!authState.client) {
+          setAuthMessage("Serviço de login indisponível no momento. Tente novamente.", true);
+          return;
+        }
+        const { error } = await authState.client.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
+        if (error) {
+          setAuthMessage(error.message, true);
+          return;
+        }
+
+        // Fallback robusto para mobile: força sincronização da sessão após login.
+        const { data: sessionData } = await authState.client.auth.getSession();
+        if (sessionData?.session?.user) {
+          authState.user = sessionData.session.user;
+          await loadCurrentUserPermissions();
+          await syncStateFromCloudOnLogin();
+          await loadSharedExportsFromCloud(true);
+          startRealtimeSubscriptions();
+          showAppShell(true);
+          setActiveTab(getTabFromLocation(), { replaceUrl: true });
+          renderAll();
+          setAuthMessage("Login realizado com sucesso.");
+          return;
+        }
+
+        setAuthMessage("Login enviado. Atualizando sessão...");
+      } catch (error) {
+        console.error("[auth] erro no login:", error);
+        setAuthMessage("Falha ao processar login. Tente novamente.", true);
       }
-      if (!authState.client) {
-        await initAuthClient();
-      }
-      if (!authState.client) {
-        setAuthMessage("Serviço de login indisponível no momento. Tente novamente.", true);
-        return;
-      }
-      const { error } = await authState.client.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
-      if (error) {
-        setAuthMessage(error.message, true);
-        return;
-      }
-      setAuthMessage("Login realizado com sucesso.");
     });
   }
 
@@ -7880,7 +7901,7 @@ function bindEvents() {
       applySalaryPaymentFormDefaults({ forceReferenceFromPaymentDate: shouldForceReference });
       renderSalaryPaymentPreview();
     });
-    salaryPaymentForm.addEventListener("submit", (event) => {
+    salaryPaymentForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       applySalaryPaymentFormDefaults();
       const data = formToObject(event.currentTarget);
