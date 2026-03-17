@@ -980,49 +980,69 @@ function normalizeStatePatterns() {
   })).filter((item) => item.description);
 
   state.payslipEmployees = (state.payslipEmployees || [])
-    .map((employee) => ({
-      id: String(employee.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`),
-      employeeName: String(employee.employeeName || "").trim(),
-      employeeCpf: formatCPF(employee.employeeCpf),
-      position: String(employee.position || "").trim(),
-      registration: String(employee.registration || "").trim(),
-      baseSalary: String(parseBRLNumber(employee.baseSalary || 0)),
-      mealAllowanceFixed: String(parseBRLNumber(employee.mealAllowanceFixed || 0)),
-      mealAllowanceDaily: String(parseBRLNumber(employee.mealAllowanceDaily || 0)),
-      fixedDiscountPercent: String(Number(employee.fixedDiscountPercent || 0)),
-      salaryHistory: Array.isArray(employee.salaryHistory)
-        ? employee.salaryHistory
-          .map((item) => ({
-            id: String(item.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`),
-            paymentDateISO: String(item.paymentDateISO || "").trim(),
-            referenceYear: Number(item.referenceYear || 0),
-            referenceMonth: Number(item.referenceMonth || 0),
-            monthTotalDays: Number(item.monthTotalDays || 0),
-            workedCalendarDays: Number(item.workedCalendarDays || 0),
-            businessDaysInMonth: Number(item.businessDaysInMonth || 0),
-            absenceDays: Number(item.absenceDays || 0),
-            allowanceDays: Number(item.allowanceDays || 0),
-            absenceJustification: String(item.absenceJustification || "").trim(),
-            allowanceJustification: String(item.allowanceJustification || "").trim(),
-            salaryAfterAbsence: Number(item.salaryAfterAbsence || 0),
-            mealAllowanceTotal: Number(item.mealAllowanceTotal || 0),
-            mealAllowanceCardDiscountValue: Number(item.mealAllowanceCardDiscountValue || 0),
-            netCashValue: Number(item.netCashValue || 0),
-            totalReceivedValue: Number(item.totalReceivedValue || 0),
-            createdAt: String(item.createdAt || "").trim(),
+    .map((employee) => {
+      const normalizedEmployee = {
+        ...employee,
+        id: String(employee.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`),
+        employeeName: String(employee.employeeName || "").trim(),
+        employeeCpf: formatCPF(employee.employeeCpf),
+        position: String(employee.position || "").trim(),
+        registration: String(employee.registration || "").trim(),
+        salaryHistory: Array.isArray(employee.salaryHistory)
+          ? employee.salaryHistory
+            .map((item) => ({
+              id: String(item.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`),
+              paymentDateISO: String(item.paymentDateISO || "").trim(),
+              referenceYear: Number(item.referenceYear || 0),
+              referenceMonth: Number(item.referenceMonth || 0),
+              monthTotalDays: Number(item.monthTotalDays || 0),
+              workedCalendarDays: Number(item.workedCalendarDays || 0),
+              businessDaysInMonth: Number(item.businessDaysInMonth || 0),
+              absenceDays: Number(item.absenceDays || 0),
+              allowanceDays: Number(item.allowanceDays || 0),
+              absenceJustification: String(item.absenceJustification || "").trim(),
+              allowanceJustification: String(item.allowanceJustification || "").trim(),
+              salaryAfterAbsence: Number(item.salaryAfterAbsence || 0),
+              mealAllowanceTotal: Number(item.mealAllowanceTotal || 0),
+              mealAllowanceCardDiscountValue: Number(item.mealAllowanceCardDiscountValue || 0),
+              netCashValue: Number(item.netCashValue || 0),
+              totalReceivedValue: Number(item.totalReceivedValue || 0),
+              createdAt: String(item.createdAt || "").trim(),
+            }))
+            .filter((item) => item.paymentDateISO && item.referenceYear && item.referenceMonth)
+          : [],
+        documents: (employee.documents || [])
+          .map((doc) => ({
+            id: String(doc.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`),
+            name: String(doc.name || "arquivo").trim() || "arquivo",
+            type: String(doc.type || "").trim(),
+            size: Number(doc.size || 0),
+            dataUrl: String(doc.dataUrl || "").trim(),
           }))
-          .filter((item) => item.paymentDateISO && item.referenceYear && item.referenceMonth)
-        : [],
-      documents: (employee.documents || [])
-        .map((doc) => ({
-          id: String(doc.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`),
-          name: String(doc.name || "arquivo").trim() || "arquivo",
-          type: String(doc.type || "").trim(),
-          size: Number(doc.size || 0),
-          dataUrl: String(doc.dataUrl || "").trim(),
-        }))
-        .filter((doc) => doc.dataUrl),
-    }))
+          .filter((doc) => doc.dataUrl),
+      };
+      const compensationHistory = getSortedEmployeeCompensationHistory({
+        ...normalizedEmployee,
+        baseSalary: String(parseBRLNumber(employee.baseSalary || 0)),
+        mealAllowanceFixed: String(parseBRLNumber(employee.mealAllowanceFixed || 0)),
+        mealAllowanceDaily: String(parseBRLNumber(employee.mealAllowanceDaily || 0)),
+        fixedDiscountPercent: String(Number(employee.fixedDiscountPercent || 0)),
+      });
+      const currentCompensation = compensationHistory[compensationHistory.length - 1] || {
+        baseSalary: "0",
+        mealAllowanceFixed: "0",
+        mealAllowanceDaily: "0",
+        fixedDiscountPercent: "0",
+      };
+      return {
+        ...normalizedEmployee,
+        baseSalary: String(parseBRLNumber(currentCompensation.baseSalary || 0)),
+        mealAllowanceFixed: String(parseBRLNumber(currentCompensation.mealAllowanceFixed || 0)),
+        mealAllowanceDaily: String(parseBRLNumber(currentCompensation.mealAllowanceDaily || 0)),
+        fixedDiscountPercent: String(Number(currentCompensation.fixedDiscountPercent || 0)),
+        compensationHistory,
+      };
+    })
     .filter((employee) => employee.employeeName);
 
   state.clients = (state.clients || [])
@@ -2974,7 +2994,14 @@ function calculatePayslipTotals() {
   const selectedEmployee = (state.payslipEmployees || []).find(
     (employee) => employee.id === String(state.payslip.selectedEmployeeId || "").trim(),
   ) || null;
-  const baseSalary = Number(state.payslip.baseSalary || 0);
+  const employeeCompensation = selectedEmployee
+    ? getEmployeeCompensationForDate(selectedEmployee, `${formatYearMonthISO(referenceYear, referenceMonth)}-01`)
+    : null;
+  const baseSalary = Number(
+    employeeCompensation
+      ? employeeCompensation.baseSalary
+      : state.payslip.baseSalary || 0,
+  );
   const monthTotalDays = getDaysInMonth(referenceYear, referenceMonth);
   const resolvedPeriod = resolveWorkPeriodFromDateInputs({
     year: referenceYear,
@@ -3011,11 +3038,11 @@ function calculatePayslipTotals() {
   const absenceSalaryDiscountValue = baseDailyValue * unexcusedAbsenceDays;
   const salaryAfterAbsence = Math.max(0, proportionalBaseSalary - absenceSalaryDiscountValue);
   const mealAllowanceFixed = 0;
-  const mealAllowanceDaily = selectedEmployee
-    ? Number(selectedEmployee.mealAllowanceDaily || 0)
+  const mealAllowanceDaily = employeeCompensation
+    ? Number(employeeCompensation.mealAllowanceDaily || 0)
     : Number(state.payslip.mealAllowanceDaily || 0);
-  const fixedDiscountPercent = selectedEmployee
-    ? Number(selectedEmployee.fixedDiscountPercent || 0)
+  const fixedDiscountPercent = employeeCompensation
+    ? Number(employeeCompensation.fixedDiscountPercent || 0)
     : Number(state.payslip.fixedDiscountPercent || 0);
   const maximumMealAllowanceDays = businessDaysInMonth;
   const mealAllowancePaidDays = workedBusinessDays;
@@ -3771,6 +3798,85 @@ function getNthBusinessDayDate(year, monthNumber, nthBusinessDay = 5) {
   return new Date(y, month - 1, totalDays);
 }
 
+function normalizeCompensationEffectiveDate(value) {
+  const parsed = parseISODateOnly(String(value || "").trim());
+  return parsed ? toISODateOnly(parsed) : "";
+}
+
+function getSortedEmployeeCompensationHistory(employee) {
+  const source = Array.isArray(employee?.compensationHistory) ? employee.compensationHistory : [];
+  const normalized = source
+    .map((item, index) => ({
+      id: String(item?.id || `${String(employee?.id || "employee")}-comp-${index + 1}`),
+      effectiveDateISO: normalizeCompensationEffectiveDate(item?.effectiveDateISO),
+      baseSalary: String(parseBRLNumber(item?.baseSalary || 0)),
+      mealAllowanceFixed: String(parseBRLNumber(item?.mealAllowanceFixed || 0)),
+      mealAllowanceDaily: String(parseBRLNumber(item?.mealAllowanceDaily || 0)),
+      fixedDiscountPercent: String(Number(item?.fixedDiscountPercent || 0)),
+      createdAt: String(item?.createdAt || "").trim(),
+    }))
+    .filter((item) => item.effectiveDateISO);
+  const fallback = {
+    id: `legacy-${String(employee?.id || "employee")}`,
+    effectiveDateISO: "1900-01-01",
+    baseSalary: String(parseBRLNumber(employee?.baseSalary || 0)),
+    mealAllowanceFixed: String(parseBRLNumber(employee?.mealAllowanceFixed || 0)),
+    mealAllowanceDaily: String(parseBRLNumber(employee?.mealAllowanceDaily || 0)),
+    fixedDiscountPercent: String(Number(employee?.fixedDiscountPercent || 0)),
+    createdAt: String(employee?.createdAt || "").trim(),
+  };
+  const list = normalized.length ? normalized : [fallback];
+  list.sort((a, b) => {
+    const dateCompare = String(a.effectiveDateISO || "").localeCompare(String(b.effectiveDateISO || ""));
+    if (dateCompare !== 0) return dateCompare;
+    return String(a.createdAt || "").localeCompare(String(b.createdAt || ""));
+  });
+  return list;
+}
+
+function getEmployeeCompensationForDate(employee, targetDateISO = "") {
+  const history = getSortedEmployeeCompensationHistory(employee);
+  if (!history.length) {
+    return {
+      baseSalary: String(parseBRLNumber(employee?.baseSalary || 0)),
+      mealAllowanceFixed: String(parseBRLNumber(employee?.mealAllowanceFixed || 0)),
+      mealAllowanceDaily: String(parseBRLNumber(employee?.mealAllowanceDaily || 0)),
+      fixedDiscountPercent: String(Number(employee?.fixedDiscountPercent || 0)),
+      effectiveDateISO: "",
+    };
+  }
+  const target = normalizeCompensationEffectiveDate(targetDateISO) || toISODateOnly(new Date());
+  let selected = history[0];
+  history.forEach((item) => {
+    if (String(item.effectiveDateISO || "") <= target) selected = item;
+  });
+  return selected;
+}
+
+function buildEmployeeCompensationUpdate(employee, updateData) {
+  const effectiveDateISO = normalizeCompensationEffectiveDate(updateData?.effectiveDateISO);
+  if (!effectiveDateISO) return getSortedEmployeeCompensationHistory(employee);
+  const nextEntry = {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    effectiveDateISO,
+    baseSalary: String(parseBRLNumber(updateData?.baseSalary || 0)),
+    mealAllowanceFixed: String(parseBRLNumber(updateData?.mealAllowanceFixed || 0)),
+    mealAllowanceDaily: String(parseBRLNumber(updateData?.mealAllowanceDaily || 0)),
+    fixedDiscountPercent: String(Number(updateData?.fixedDiscountPercent || 0)),
+    createdAt: new Date().toISOString(),
+  };
+  const merged = [
+    ...getSortedEmployeeCompensationHistory(employee),
+    nextEntry,
+  ];
+  merged.sort((a, b) => {
+    const dateCompare = String(a.effectiveDateISO || "").localeCompare(String(b.effectiveDateISO || ""));
+    if (dateCompare !== 0) return dateCompare;
+    return String(a.createdAt || "").localeCompare(String(b.createdAt || ""));
+  });
+  return merged;
+}
+
 function calculateMonthlySalarySettlement({
   employee,
   year,
@@ -3782,10 +3888,14 @@ function calculateMonthlySalarySettlement({
   absenceDays,
   allowanceDays,
 }) {
-  const baseSalary = Number(employee?.baseSalary || 0);
-  const mealAllowanceFixed = 0;
-  const mealAllowanceDaily = Number(employee?.mealAllowanceDaily || 0);
-  const fixedDiscountPercent = Number(employee?.fixedDiscountPercent || 0);
+  const referenceDateISO = formatYearMonthISO(year, monthNumber)
+    ? `${formatYearMonthISO(year, monthNumber)}-01`
+    : "";
+  const compensation = getEmployeeCompensationForDate(employee, referenceDateISO);
+  const baseSalary = Number(compensation?.baseSalary || 0);
+  const mealAllowanceFixed = Number(compensation?.mealAllowanceFixed || 0);
+  const mealAllowanceDaily = Number(compensation?.mealAllowanceDaily || 0);
+  const fixedDiscountPercent = Number(compensation?.fixedDiscountPercent || 0);
   const totalDays = Math.max(1, Number(monthTotalDays || getDaysInMonth(year, monthNumber)));
   const workPeriod = resolveWorkPeriodInMonth(totalDays, firstWorkDayInMonth, lastWorkDayInMonth);
   const businessDaysByRange = countWeekdaysBetweenDays(
@@ -4665,6 +4775,11 @@ function renderSavedPayslipEmployees() {
 function loadSavedPayslipEmployee(employeeId) {
   const employee = state.payslipEmployees.find((item) => item.id === employeeId);
   if (!employee) return;
+  const reference = inferReferenceYearMonth(state.payslip.referenceMonth, state.payslip.paymentDate);
+  const compensation = getEmployeeCompensationForDate(
+    employee,
+    `${formatYearMonthISO(reference.year, reference.month)}-01`,
+  );
   state.payslip = {
     ...state.payslip,
     selectedEmployeeId: employee.id,
@@ -4672,10 +4787,10 @@ function loadSavedPayslipEmployee(employeeId) {
     employeeCpf: employee.employeeCpf,
     position: employee.position,
     registration: employee.registration,
-    baseSalary: employee.baseSalary,
-    mealAllowanceFixed: String(Number(employee.mealAllowanceFixed || 0)),
-    mealAllowanceDaily: String(Number(employee.mealAllowanceDaily || 0)),
-    fixedDiscountPercent: String(Number(employee.fixedDiscountPercent || 0)),
+    baseSalary: String(parseBRLNumber(compensation.baseSalary || employee.baseSalary || 0)),
+    mealAllowanceFixed: String(parseBRLNumber(compensation.mealAllowanceFixed || employee.mealAllowanceFixed || 0)),
+    mealAllowanceDaily: String(parseBRLNumber(compensation.mealAllowanceDaily || employee.mealAllowanceDaily || 0)),
+    fixedDiscountPercent: String(Number(compensation.fixedDiscountPercent || employee.fixedDiscountPercent || 0)),
   };
   saveState();
   renderAll();
@@ -4694,8 +4809,12 @@ function resetEmployeeCatalogForm() {
   });
   const fixedDiscountInput = form.elements.namedItem("fixedDiscountPercent");
   if (fixedDiscountInput) fixedDiscountInput.value = "0";
+  const effectiveDateInput = form.elements.namedItem("compensationEffectiveDate");
+  if (effectiveDateInput) effectiveDateInput.value = "";
   const docsInput = document.getElementById("employeeDocsInput");
   if (docsInput) docsInput.value = "";
+  const updateButton = document.getElementById("btnUpdateEmployeeData");
+  if (updateButton) updateButton.classList.add("auth-hidden");
   renderPendingEmployeeDocuments();
 }
 
@@ -4703,17 +4822,21 @@ function setEmployeeCatalogForm(employee) {
   const form = document.getElementById("employeeCatalogForm");
   if (!form || !employee) return;
   uiState.editingEmployeeId = String(employee.id || "");
+  const currentCompensation = getEmployeeCompensationForDate(employee, toISODateOnly(new Date()));
   setFormValues(form, {
     employeeName: employee.employeeName || "",
     employeeCpf: employee.employeeCpf || "",
     position: employee.position || "",
     registration: employee.registration || "",
-    baseSalary: formatBRLInputValue(employee.baseSalary || 0),
-    mealAllowanceFixed: formatBRLInputValue(employee.mealAllowanceFixed || 0),
-    mealAllowanceDaily: formatBRLInputValue(employee.mealAllowanceDaily || 0),
-    fixedDiscountPercent: employee.fixedDiscountPercent || "0",
+    baseSalary: formatBRLInputValue(currentCompensation.baseSalary || employee.baseSalary || 0),
+    mealAllowanceFixed: formatBRLInputValue(currentCompensation.mealAllowanceFixed || employee.mealAllowanceFixed || 0),
+    mealAllowanceDaily: formatBRLInputValue(currentCompensation.mealAllowanceDaily || employee.mealAllowanceDaily || 0),
+    fixedDiscountPercent: currentCompensation.fixedDiscountPercent || employee.fixedDiscountPercent || "0",
+    compensationEffectiveDate: toISODateOnly(new Date()),
   });
   uiState.pendingEmployeeDocuments = JSON.parse(JSON.stringify(employee.documents || []));
+  const updateButton = document.getElementById("btnUpdateEmployeeData");
+  if (updateButton) updateButton.classList.remove("auth-hidden");
   renderPendingEmployeeDocuments();
   setupBRLInputs(form);
 }
@@ -4793,6 +4916,7 @@ function exportEmployeesCsv() {
 }
 
 function exportEmployeeJson(employee) {
+  const compensationHistory = getSortedEmployeeCompensationHistory(employee);
   const payload = {
     id: employee.id,
     nome: employee.employeeName,
@@ -4803,6 +4927,15 @@ function exportEmployeeJson(employee) {
     valeAlimentacaoFixo: Number(employee.mealAllowanceFixed || 0),
     valeAlimentacaoDiario: Number(employee.mealAllowanceDaily || 0),
     descontoFixoPercentual: Number(employee.fixedDiscountPercent || 0),
+    historicoRemuneracao: compensationHistory.map((item) => ({
+      id: item.id,
+      vigencia: item.effectiveDateISO,
+      salarioBase: Number(item.baseSalary || 0),
+      valeAlimentacaoFixo: Number(item.mealAllowanceFixed || 0),
+      valeAlimentacaoDiario: Number(item.mealAllowanceDaily || 0),
+      descontoFixoPercentual: Number(item.fixedDiscountPercent || 0),
+      criadoEm: item.createdAt || "",
+    })),
     historicoPagamentos: (employee.salaryHistory || []).map((item) => ({
       id: item.id,
       pagoEm: item.paymentDateISO,
@@ -4967,6 +5100,19 @@ function renderEmployeeDetailsView() {
     .join("");
   const salaryHistory = [...(employee.salaryHistory || [])]
     .sort((a, b) => String(b.paymentDateISO || "").localeCompare(String(a.paymentDateISO || "")));
+  const compensationHistory = [...getSortedEmployeeCompensationHistory(employee)]
+    .sort((a, b) => String(b.effectiveDateISO || "").localeCompare(String(a.effectiveDateISO || "")));
+  const compensationRows = compensationHistory
+    .map((item) => `
+      <tr>
+        <td>${formatDateBR(item.effectiveDateISO)}</td>
+        <td>${currencyBRL.format(Number(item.baseSalary || 0))}</td>
+        <td>${currencyBRL.format(Number(item.mealAllowanceFixed || 0))}</td>
+        <td>${currencyBRL.format(Number(item.mealAllowanceDaily || 0))}</td>
+        <td>${escapeHtml(String(item.fixedDiscountPercent || "0"))}%</td>
+      </tr>
+    `)
+    .join("");
   const salaryRows = salaryHistory
     .map((item) => `
       <tr>
@@ -4999,6 +5145,21 @@ function renderEmployeeDetailsView() {
     <table class="balance-table">
       <tbody>${rows}</tbody>
     </table>
+    <h3 style="margin-top: 16px;">Histórico de Atualizações (Vigência)</h3>
+    ${compensationHistory.length ? `
+      <table class="balance-table">
+        <thead>
+          <tr>
+            <th>Vigência</th>
+            <th>Salário base</th>
+            <th>VA fixo</th>
+            <th>VA diário</th>
+            <th>Desc. fixo</th>
+          </tr>
+        </thead>
+        <tbody>${compensationRows}</tbody>
+      </table>
+    ` : '<div class="small">Sem histórico de vigência cadastrado.</div>'}
     <h3 style="margin-top: 16px;">Relatório de Pagamentos Salariais</h3>
     ${salaryHistory.length ? `
       <table class="balance-table">
@@ -7466,10 +7627,14 @@ function bindEvents() {
   const persistPayslipForm = ({ forceReferenceFromPaymentDate = false } = {}) => {
     const defaults = applyPayslipFormDefaults({ forceReferenceFromPaymentDate });
     const next = formToObject(payslipForm);
+    const referenceMonthISO = defaults?.referenceMonthISO || String(next.referenceMonth || "").trim();
+    const reference = inferReferenceYearMonth(referenceMonthISO, String(next.paymentDate || "").trim());
     const selectedEmployee = (state.payslipEmployees || []).find(
       (employee) => employee.id === String(next.selectedEmployeeId || state.payslip.selectedEmployeeId || "").trim(),
     ) || null;
-    const referenceMonthISO = defaults?.referenceMonthISO || String(next.referenceMonth || "").trim();
+    const employeeCompensation = selectedEmployee
+      ? getEmployeeCompensationForDate(selectedEmployee, `${formatYearMonthISO(reference.year, reference.month)}-01`)
+      : null;
     const competence = String(defaults?.competence || "").trim();
     const monthTotalDays = Number(defaults?.monthTotalDays || getDaysInMonth(new Date().getFullYear(), new Date().getMonth() + 1));
     const normalizedFirstDateISO = defaults?.firstWorkDateISO || String(next.firstWorkDayInMonth || "").trim();
@@ -7483,25 +7648,29 @@ function bindEvents() {
       referenceMonth: referenceMonthISO,
       employeeCpf: formatCPF(next.employeeCpf),
       baseSalary: String(parseBRLNumber(
-        Object.prototype.hasOwnProperty.call(next, "baseSalary") ? next.baseSalary : state.payslip.baseSalary,
+        employeeCompensation
+          ? employeeCompensation.baseSalary
+          : Object.prototype.hasOwnProperty.call(next, "baseSalary")
+            ? next.baseSalary
+            : state.payslip.baseSalary,
       )),
       mealAllowanceFixed: String(parseBRLNumber(
-        selectedEmployee
-          ? selectedEmployee.mealAllowanceFixed
+        employeeCompensation
+          ? employeeCompensation.mealAllowanceFixed
           : Object.prototype.hasOwnProperty.call(next, "mealAllowanceFixed")
             ? next.mealAllowanceFixed
             : state.payslip.mealAllowanceFixed,
       )),
       mealAllowanceDaily: String(parseBRLNumber(
-        selectedEmployee
-          ? selectedEmployee.mealAllowanceDaily
+        employeeCompensation
+          ? employeeCompensation.mealAllowanceDaily
           : Object.prototype.hasOwnProperty.call(next, "mealAllowanceDaily")
             ? next.mealAllowanceDaily
             : state.payslip.mealAllowanceDaily,
       )),
       fixedDiscountPercent: String(Number(
-        selectedEmployee
-          ? selectedEmployee.fixedDiscountPercent
+        employeeCompensation
+          ? employeeCompensation.fixedDiscountPercent
           : Object.prototype.hasOwnProperty.call(next, "fixedDiscountPercent")
             ? next.fixedDiscountPercent
             : state.payslip.fixedDiscountPercent,
@@ -7670,6 +7839,7 @@ function bindEvents() {
       return;
     }
     const data = formToObject(employeeCatalogForm);
+    const submitAction = String(event.submitter?.getAttribute("data-employee-action") || "save").trim().toLowerCase();
     const employeeName = String(data.employeeName || "").trim();
     const employeeCpf = formatCPF(data.employeeCpf || "");
     if (!employeeName || !employeeCpf) {
@@ -7689,6 +7859,7 @@ function bindEvents() {
       fixedDiscountPercent: String(Number(data.fixedDiscountPercent || 0)),
       documents: JSON.parse(JSON.stringify(uiState.pendingEmployeeDocuments || [])),
       salaryHistory: [],
+      compensationHistory: [],
     };
 
     const existingIndex = state.payslipEmployees.findIndex((employee) => employee.id === payload.id);
@@ -7705,6 +7876,53 @@ function bindEvents() {
         : null;
     const isEditing = Boolean(previousEmployee);
     payload.salaryHistory = JSON.parse(JSON.stringify((previousEmployee && previousEmployee.salaryHistory) || []));
+    payload.compensationHistory = JSON.parse(JSON.stringify((previousEmployee && previousEmployee.compensationHistory) || []));
+
+    const compensationEffectiveDate = normalizeCompensationEffectiveDate(data.compensationEffectiveDate);
+    const currentCompensation = previousEmployee
+      ? getEmployeeCompensationForDate(previousEmployee, toISODateOnly(new Date()))
+      : null;
+    const nextCompensationValues = {
+      baseSalary: String(parseBRLNumber(data.baseSalary || 0)),
+      mealAllowanceFixed: String(parseBRLNumber(data.mealAllowanceFixed || 0)),
+      mealAllowanceDaily: String(parseBRLNumber(data.mealAllowanceDaily || 0)),
+      fixedDiscountPercent: String(Number(data.fixedDiscountPercent || 0)),
+    };
+
+    if (isEditing && submitAction !== "update" && currentCompensation) {
+      const changedCompensationWithoutUpdate = (
+        String(nextCompensationValues.baseSalary) !== String(currentCompensation.baseSalary || "0")
+        || String(nextCompensationValues.mealAllowanceFixed) !== String(currentCompensation.mealAllowanceFixed || "0")
+        || String(nextCompensationValues.mealAllowanceDaily) !== String(currentCompensation.mealAllowanceDaily || "0")
+        || String(nextCompensationValues.fixedDiscountPercent) !== String(currentCompensation.fixedDiscountPercent || "0")
+      );
+      if (changedCompensationWithoutUpdate) {
+        alert("Para alterar salário/benefícios sem afetar o histórico, use o botão 'Atualizar dados' e informe a data de vigência.");
+        return;
+      }
+    }
+
+    if (!isEditing) {
+      payload.compensationHistory = buildEmployeeCompensationUpdate(payload, {
+        ...nextCompensationValues,
+        effectiveDateISO: compensationEffectiveDate || toISODateOnly(new Date()),
+      });
+    } else if (submitAction === "update") {
+      if (!compensationEffectiveDate) {
+        alert("Informe a data de vigência para atualizar salário/benefícios.");
+        return;
+      }
+      payload.compensationHistory = buildEmployeeCompensationUpdate(previousEmployee, {
+        ...nextCompensationValues,
+        effectiveDateISO: compensationEffectiveDate,
+      });
+    }
+
+    const effectiveCompensation = getEmployeeCompensationForDate(payload, toISODateOnly(new Date()));
+    payload.baseSalary = String(parseBRLNumber(effectiveCompensation.baseSalary || 0));
+    payload.mealAllowanceFixed = String(parseBRLNumber(effectiveCompensation.mealAllowanceFixed || 0));
+    payload.mealAllowanceDaily = String(parseBRLNumber(effectiveCompensation.mealAllowanceDaily || 0));
+    payload.fixedDiscountPercent = String(Number(effectiveCompensation.fixedDiscountPercent || 0));
 
     if (existingIndex >= 0) {
       state.payslipEmployees[existingIndex] = payload;
@@ -7719,11 +7937,13 @@ function bindEvents() {
       uiState.viewingEmployeeId = "";
       loadSavedPayslipEmployee(payload.id);
       void logAuditAction({
-        action: isEditing ? "update" : "create",
+        action: isEditing ? (submitAction === "update" ? "compensation_update" : "update") : "create",
         module: "employees",
         entityType: "employee",
         entityId: payload.id,
-        description: isEditing ? "Funcionário atualizado." : "Funcionário criado.",
+        description: isEditing
+          ? (submitAction === "update" ? "Dados de remuneração atualizados com vigência." : "Funcionário atualizado.")
+          : "Funcionário criado.",
         before: previousEmployee,
         after: payload,
       });
@@ -7732,11 +7952,13 @@ function bindEvents() {
 
     saveState();
     void logAuditAction({
-      action: isEditing ? "update" : "create",
+      action: isEditing ? (submitAction === "update" ? "compensation_update" : "update") : "create",
       module: "employees",
       entityType: "employee",
       entityId: payload.id,
-      description: isEditing ? "Funcionário atualizado." : "Funcionário criado.",
+      description: isEditing
+        ? (submitAction === "update" ? "Dados de remuneração atualizados com vigência." : "Funcionário atualizado.")
+        : "Funcionário criado.",
       before: previousEmployee,
       after: payload,
     });
@@ -7744,7 +7966,11 @@ function bindEvents() {
     uiState.viewingEmployeeId = "";
     resetEmployeeCatalogForm();
     renderAll();
-    alert("Funcionário salvo com sucesso.");
+    if (isEditing && submitAction === "update") {
+      alert("Dados de remuneração atualizados com vigência.");
+    } else {
+      alert("Funcionário salvo com sucesso.");
+    }
   });
 
   document.getElementById("employeeCatalogList").addEventListener("click", async (event) => {

@@ -332,6 +332,9 @@
               <label>Vale alimentação fixo (R$)<input name="mealAllowanceFixed" data-brl inputmode="numeric" value="R$ 0,00" /></label>
               <label>Vale alimentação diário (R$)<input name="mealAllowanceDaily" data-brl inputmode="numeric" value="R$ 0,00" /></label>
               <label>Descontos fixos (%)<input name="fixedDiscountPercent" type="number" min="0" step="0.01" value="0" /></label>
+              <label>Data de vigência da atualização
+                <input name="compensationEffectiveDate" type="date" />
+              </label>
               <label class="full">Anexar documentos do funcionário
                 <input id="employeeDocsInput" type="file" multiple />
               </label>
@@ -339,7 +342,8 @@
                 <ul id="employeePendingDocsList" class="list"></ul>
               </div>
               <div class="full row-end">
-                <button class="btn" type="submit">Salvar funcionário</button>
+                <button class="btn" type="submit" data-employee-action="save">Salvar funcionário</button>
+                <button id="btnUpdateEmployeeData" class="btn auth-hidden" type="submit" data-employee-action="update">Atualizar dados</button>
               </div>
             </form>
           </div>
