@@ -176,6 +176,7 @@ const cloudSyncState = {
   sharedStateLastUpdatedAt: 0,
   sharedStateRealtimeChannel: null,
   sharedExportsRealtimeChannel: null,
+  localDirtySince: 0,
 };
 
 const DEFAULT_APP_PERMISSIONS = {
@@ -1170,6 +1171,7 @@ function normalizeStatePatterns() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(getStateSnapshot()));
+  cloudSyncState.localDirtySince = Date.now();
   scheduleCloudStateSave();
 }
 
@@ -1251,6 +1253,7 @@ async function saveCloudStateNow() {
       console.warn("[cloud-state] Falha ao salvar:", error.message);
     } else {
       cloudSyncState.sharedStateLastUpdatedAt = Date.now();
+      cloudSyncState.localDirtySince = 0;
     }
   } catch (error) {
     console.warn("[cloud-state] Erro ao salvar:", error);
@@ -1322,11 +1325,20 @@ async function refreshStateFromCloudIfNewer(force = false) {
   if (!cloudHasContent && localHasContent && !force) return;
   if (!cloudHasContent && !force) return;
   const cloudTs = cloudSavedAt ? cloudSavedAt.getTime() : 0;
+  if (!force) {
+    if (cloudSyncState.sharedStateLastUpdatedAt && cloudTs && cloudTs <= cloudSyncState.sharedStateLastUpdatedAt) {
+      return;
+    }
+    if (cloudSyncState.localDirtySince && (Date.now() - cloudSyncState.localDirtySince) < 5000) {
+      return;
+    }
+  }
   cloudSyncState.suppressSave = true;
   applyStateSnapshot(cloudSnapshot);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudSnapshot));
   cloudSyncState.suppressSave = false;
   cloudSyncState.sharedStateLastUpdatedAt = cloudTs || Date.now();
+  cloudSyncState.localDirtySince = 0;
   renderAll();
 }
 
@@ -1422,7 +1434,12 @@ async function syncStateFromCloudOnLogin() {
     }
 
     const localRaw = localStorage.getItem(STORAGE_KEY);
-    const localSnapshot = localRaw ? JSON.parse(localRaw) : null;
+    let localSnapshot = null;
+    try {
+      localSnapshot = localRaw ? JSON.parse(localRaw) : null;
+    } catch {
+      localSnapshot = null;
+    }
     const cloudSnapshot = data?.state_data && typeof data.state_data === "object" ? data.state_data : null;
     const cloudSavedAt = getCloudSnapshotSavedAt(cloudSnapshot, data?.updated_at);
     const cloudHasContent = hasStateContent(cloudSnapshot);
@@ -1452,6 +1469,7 @@ async function syncStateFromCloudOnLogin() {
     startSharedStateRefreshTimer();
   } catch (error) {
     cloudSyncState.suppressSave = false;
+    cloudSyncState.hasLoadedFromCloud = true;
     console.warn("[cloud-state] Erro ao sincronizar:", error);
   }
 }
@@ -6791,6 +6809,7 @@ function bindEvents() {
     cloudSyncState.sharedExportsLoading = false;
     cloudSyncState.sharedExportsLastSyncAt = 0;
     cloudSyncState.sharedStateLastUpdatedAt = 0;
+    cloudSyncState.localDirtySince = 0;
     if (authState.client) {
       try {
         await authState.client.auth.signOut();
