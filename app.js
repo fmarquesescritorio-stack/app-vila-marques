@@ -6,6 +6,7 @@ const AUTH_CONFIG_LOCK_KEY = "vm-auth-config-locked";
 const LOCAL_TEST_SESSION_KEY = "vm-local-test-session";
 const DEFAULT_SUPABASE_URL = "https://tyyikeewyzysikngjior.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_b2GWLZESqIVkljASGuYaUw_Uiotdk6f";
+const FORCE_DEFAULT_SUPABASE_CONFIG = true;
 const OWNER_ADMIN_EMAILS = new Set([
   "fmarquesescritorio@gmail.com",
   "lu.priscila@hotmail.com",
@@ -1564,6 +1565,14 @@ function getSupabaseConfig() {
   const storedAnon = String(localStorage.getItem(SUPABASE_ANON_KEY) || "").trim();
   const defaultUrl = String(DEFAULT_SUPABASE_URL || "").trim();
   const defaultAnon = String(DEFAULT_SUPABASE_ANON_KEY || "").trim();
+  if (FORCE_DEFAULT_SUPABASE_CONFIG && defaultUrl && defaultAnon) {
+    if (storedUrl !== defaultUrl) localStorage.setItem(SUPABASE_URL_KEY, defaultUrl);
+    if (storedAnon !== defaultAnon) localStorage.setItem(SUPABASE_ANON_KEY, defaultAnon);
+    return {
+      url: defaultUrl,
+      anonKey: defaultAnon,
+    };
+  }
   const url = /^https?:\/\//i.test(storedUrl) ? storedUrl : defaultUrl;
   const anonKey = storedAnon.length > 12 ? storedAnon : defaultAnon;
   return {
