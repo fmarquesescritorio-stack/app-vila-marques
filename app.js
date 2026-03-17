@@ -5362,8 +5362,9 @@ function syncRentedPropertyToContractLink(propertyId, contractId) {
 function renderRentedPropertiesModule() {
   const formContainer = document.getElementById("rentedPropertyFormContainer");
   const listContainer = document.getElementById("rentedPropertiesSavedList");
+  const statementContainer = document.getElementById("rentedPropertiesPaymentStatement");
   const btnBack = document.getElementById("btnBackToRentedPropertiesList");
-  if (!formContainer || !listContainer || !btnBack) return;
+  if (!formContainer || !listContainer || !btnBack || !statementContainer) return;
 
   formContainer.classList.toggle("auth-hidden", !uiState.rentedPropertiesFormOpen);
   btnBack.classList.toggle("auth-hidden", !uiState.rentedPropertiesFormOpen);
@@ -5418,6 +5419,103 @@ function renderRentedPropertiesModule() {
       </table>
     `
     : '<div class="small">Nenhum imóvel alugado cadastrado.</div>';
+
+  renderRentedPropertiesPaymentStatement(statementContainer);
+}
+
+function renderRentedPropertiesPaymentStatement(container) {
+  const grouped = new Map();
+  const allProperties = Array.isArray(state.rentedProperties) ? state.rentedProperties : [];
+
+  allProperties.forEach((property) => {
+    const contractId = String(property.contractId || "").trim();
+    const groupKey = contractId || "__sem_contrato__";
+    const contractName = contractId ? getContractDisplayName(contractId) : "Sem contrato vinculado";
+    if (!grouped.has(groupKey)) {
+      grouped.set(groupKey, {
+        contractName,
+        entries: [],
+      });
+    }
+    const group = grouped.get(groupKey);
+    const history = Array.isArray(property.paymentHistory) ? property.paymentHistory : [];
+    history.forEach((payment) => {
+      group.entries.push({
+        propertyName: String(property.name || "Sem nome"),
+        dueDateISO: String(payment.dueDateISO || "").trim(),
+        paymentDateISO: String(payment.paymentDateISO || "").trim(),
+        expectedAmount: Number(payment.expectedAmount || 0),
+        paidAmount: Number(payment.paidAmount ?? payment.expectedAmount ?? 0),
+        discountAmount: Number(payment.discountAmount || 0),
+        discountReason: String(payment.discountReason || "").trim(),
+      });
+    });
+  });
+
+  const groups = Array.from(grouped.values())
+    .map((group) => ({
+      ...group,
+      entries: group.entries.sort((a, b) => String(b.paymentDateISO || "").localeCompare(String(a.paymentDateISO || ""))),
+    }))
+    .filter((group) => group.entries.length > 0)
+    .sort((a, b) => a.contractName.localeCompare(b.contractName, "pt-BR"));
+
+  if (!groups.length) {
+    container.innerHTML = `
+      <h3 style="margin-top: 0;">Extrato de Aluguéis Pagos</h3>
+      <div class="small">Nenhum pagamento de aluguel registrado ainda.</div>
+    `;
+    return;
+  }
+
+  const html = groups.map((group) => {
+    const summary = group.entries.reduce((acc, entry) => {
+      acc.expected += Number(entry.expectedAmount || 0);
+      acc.paid += Number(entry.paidAmount || 0);
+      acc.discount += Number(entry.discountAmount || 0);
+      return acc;
+    }, { expected: 0, paid: 0, discount: 0 });
+
+    const rows = group.entries.map((entry) => `
+      <tr>
+        <td>${escapeHtml(entry.propertyName)}</td>
+        <td>${formatDateBR(entry.dueDateISO)}</td>
+        <td>${formatDateBR(entry.paymentDateISO)}</td>
+        <td class="balance-expense">${currencyBRL.format(Number(entry.expectedAmount || 0))}</td>
+        <td class="balance-income">${currencyBRL.format(Number(entry.paidAmount || 0))}</td>
+        <td class="balance-expense">${currencyBRL.format(Number(entry.discountAmount || 0))}</td>
+        <td>${escapeHtml(entry.discountReason || "-")}</td>
+      </tr>
+    `).join("");
+
+    return `
+      <section class="panel" style="margin-top: 10px;">
+        <h4 style="margin-top: 0;">Contrato: ${escapeHtml(group.contractName)}</h4>
+        <table class="balance-table">
+          <thead>
+            <tr>
+              <th>Imóvel</th>
+              <th>Vencimento</th>
+              <th>Pago em</th>
+              <th>Valor previsto</th>
+              <th>Valor pago</th>
+              <th>Desconto</th>
+              <th>Justificativa</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="small" style="margin-top: 8px;">
+          <strong>Resumo:</strong> ${group.entries.length} pagamento(s) | Previsto: ${currencyBRL.format(summary.expected)} | Pago: ${currencyBRL.format(summary.paid)} | Descontos: ${currencyBRL.format(summary.discount)}
+        </div>
+      </section>
+    `;
+  }).join("");
+
+  container.innerHTML = `
+    <h3 style="margin-top: 0;">Extrato de Aluguéis Pagos (por contrato)</h3>
+    ${html}
+  `;
 }
 
 function resetClientCatalogForm() {
