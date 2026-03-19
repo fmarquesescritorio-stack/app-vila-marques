@@ -5567,11 +5567,38 @@ function renderRentedPropertiesModule() {
     if (editing) setRentedPropertyForm(editing);
   }
 
-  const rows = [...(state.rentedProperties || [])]
+  const isMobile = window.matchMedia("(max-width: 840px)").matches;
+  const sortedProperties = [...(state.rentedProperties || [])]
     .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime())
     .map((property) => {
       const isOverdue = isRentedPropertyOverdue(property);
       const noticeLabel = getRentedPropertyContractNoticeLabel(property);
+      const actionsHtml = `
+        <div class="exports-actions">
+          <button type="button" class="btn" data-action="edit-rented-property" data-rented-property-id="${escapeHtml(property.id)}">Editar</button>
+          <button type="button" class="btn btn-primary" data-action="mark-rented-property-paid" data-rented-property-id="${escapeHtml(property.id)}">Marcar pago</button>
+          <button type="button" class="btn btn-danger" data-action="delete-rented-property" data-rented-property-id="${escapeHtml(property.id)}">Apagar</button>
+        </div>
+      `;
+      if (isMobile) {
+        return `
+          <article class="mobile-record-card">
+            <div class="mobile-record-head">
+              <strong>${escapeHtml(property.name || "Sem nome")}</strong>
+              ${isOverdue ? '<span class="tag-overdue">Atrasado</span>' : ""}
+            </div>
+            <div class="mobile-record-grid">
+              <div><span class="small">Contrato</span><strong>${escapeHtml(getContractDisplayName(property.contractId))}</strong></div>
+              <div><span class="small">Período</span><strong>${formatDateBR(property.contractStartDateISO)} até ${formatDateBR(property.contractEndDateISO)}</strong></div>
+              <div><span class="small">Aviso prévio</span><strong>${noticeLabel ? escapeHtml(noticeLabel) : "-"}</strong></div>
+              <div><span class="small">Próximo vencimento</span><strong>${formatDateBR(property.nextDueDateISO)}</strong></div>
+              <div><span class="small">Aluguel mensal</span><strong class="balance-expense">${currencyBRL.format(Number(property.rentAmount || 0))}</strong></div>
+              <div><span class="small">Atualizado em</span><strong>${formatDateTimeBR(property.updatedAt)}</strong></div>
+            </div>
+            ${actionsHtml}
+          </article>
+        `;
+      }
       return `
         <tr>
           <td>${escapeHtml(property.name || "Sem nome")}</td>
@@ -5581,20 +5608,17 @@ function renderRentedPropertiesModule() {
           <td>${formatDateBR(property.nextDueDateISO)} ${isOverdue ? '<span class="tag-overdue">Atrasado</span>' : ""}</td>
           <td class="balance-expense">${currencyBRL.format(Number(property.rentAmount || 0))}</td>
           <td>${formatDateTimeBR(property.updatedAt)}</td>
-          <td>
-            <div class="exports-actions">
-              <button type="button" class="btn" data-action="edit-rented-property" data-rented-property-id="${escapeHtml(property.id)}">Editar</button>
-              <button type="button" class="btn btn-primary" data-action="mark-rented-property-paid" data-rented-property-id="${escapeHtml(property.id)}">Marcar pago</button>
-              <button type="button" class="btn btn-danger" data-action="delete-rented-property" data-rented-property-id="${escapeHtml(property.id)}">Apagar</button>
-            </div>
-          </td>
+          <td>${actionsHtml}</td>
         </tr>
       `;
-    })
-    .join("");
+    });
+
+  const rows = sortedProperties.join("");
 
   listContainer.innerHTML = rows
-    ? `
+    ? isMobile
+      ? `<div class="mobile-record-list">${rows}</div>`
+      : `
       <table class="balance-table">
         <thead>
           <tr>
@@ -5617,6 +5641,7 @@ function renderRentedPropertiesModule() {
 }
 
 function renderRentedPropertiesPaymentStatement(container) {
+  const isMobile = window.matchMedia("(max-width: 840px)").matches;
   const grouped = new Map();
   const allProperties = Array.isArray(state.rentedProperties) ? state.rentedProperties : [];
 
@@ -5669,35 +5694,56 @@ function renderRentedPropertiesPaymentStatement(container) {
       return acc;
     }, { expected: 0, paid: 0, discount: 0 });
 
-    const rows = group.entries.map((entry) => `
-      <tr>
-        <td>${escapeHtml(entry.propertyName)}</td>
-        <td>${formatDateBR(entry.dueDateISO)}</td>
-        <td>${formatDateBR(entry.paymentDateISO)}</td>
-        <td class="balance-expense">${currencyBRL.format(Number(entry.expectedAmount || 0))}</td>
-        <td class="balance-income">${currencyBRL.format(Number(entry.paidAmount || 0))}</td>
-        <td class="balance-expense">${currencyBRL.format(Number(entry.discountAmount || 0))}</td>
-        <td>${escapeHtml(entry.discountReason || "-")}</td>
-      </tr>
-    `).join("");
+    const rows = group.entries.map((entry) => {
+      if (isMobile) {
+        return `
+          <article class="mobile-record-card">
+            <div class="mobile-record-head">
+              <strong>${escapeHtml(entry.propertyName)}</strong>
+            </div>
+            <div class="mobile-record-grid">
+              <div><span class="small">Vencimento</span><strong>${formatDateBR(entry.dueDateISO)}</strong></div>
+              <div><span class="small">Pago em</span><strong>${formatDateBR(entry.paymentDateISO)}</strong></div>
+              <div><span class="small">Valor previsto</span><strong class="balance-expense">${currencyBRL.format(Number(entry.expectedAmount || 0))}</strong></div>
+              <div><span class="small">Valor pago</span><strong class="balance-income">${currencyBRL.format(Number(entry.paidAmount || 0))}</strong></div>
+              <div><span class="small">Desconto</span><strong class="balance-expense">${currencyBRL.format(Number(entry.discountAmount || 0))}</strong></div>
+              <div><span class="small">Justificativa</span><strong>${escapeHtml(entry.discountReason || "-")}</strong></div>
+            </div>
+          </article>
+        `;
+      }
+      return `
+        <tr>
+          <td>${escapeHtml(entry.propertyName)}</td>
+          <td>${formatDateBR(entry.dueDateISO)}</td>
+          <td>${formatDateBR(entry.paymentDateISO)}</td>
+          <td class="balance-expense">${currencyBRL.format(Number(entry.expectedAmount || 0))}</td>
+          <td class="balance-income">${currencyBRL.format(Number(entry.paidAmount || 0))}</td>
+          <td class="balance-expense">${currencyBRL.format(Number(entry.discountAmount || 0))}</td>
+          <td>${escapeHtml(entry.discountReason || "-")}</td>
+        </tr>
+      `;
+    }).join("");
 
     return `
       <section class="panel" style="margin-top: 10px;">
         <h4 style="margin-top: 0;">Contrato: ${escapeHtml(group.contractName)}</h4>
-        <table class="balance-table">
-          <thead>
-            <tr>
-              <th>Imóvel</th>
-              <th>Vencimento</th>
-              <th>Pago em</th>
-              <th>Valor previsto</th>
-              <th>Valor pago</th>
-              <th>Desconto</th>
-              <th>Justificativa</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
+        ${isMobile ? `<div class="mobile-record-list">${rows}</div>` : `
+          <table class="balance-table">
+            <thead>
+              <tr>
+                <th>Imóvel</th>
+                <th>Vencimento</th>
+                <th>Pago em</th>
+                <th>Valor previsto</th>
+                <th>Valor pago</th>
+                <th>Desconto</th>
+                <th>Justificativa</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `}
         <div class="small" style="margin-top: 8px;">
           <strong>Resumo:</strong> ${group.entries.length} pagamento(s) | Previsto: ${currencyBRL.format(summary.expected)} | Pago: ${currencyBRL.format(summary.paid)} | Descontos: ${currencyBRL.format(summary.discount)}
         </div>

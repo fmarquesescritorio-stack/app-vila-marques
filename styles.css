@@ -1300,6 +1300,50 @@ input:focus, select:focus, textarea:focus {
   font-weight: 700;
 }
 
+.mobile-record-list {
+  display: grid;
+  gap: 10px;
+}
+
+.mobile-record-card {
+  border: 1px solid #d9e2ec;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+}
+
+.mobile-record-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mobile-record-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+  margin-bottom: 8px;
+}
+
+.mobile-record-grid > div {
+  min-width: 0;
+}
+
+.mobile-record-grid .small {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.mobile-record-grid strong {
+  display: block;
+  font-size: 13px;
+  line-height: 1.35;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
 .balance-table {
   width: 100%;
   border-collapse: collapse;
@@ -1561,6 +1605,9 @@ body.balance-values-blurred #balanceModule .month-profit {
   .balance-filters { flex-direction: column; }
   .balance-filters label { min-width: 100%; }
   .balance-summary-grid { grid-template-columns: 1fr; }
+  .mobile-record-grid {
+    grid-template-columns: 1fr;
+  }
   #clientsModule .panel,
   #employeesModule .panel,
   #contractsModule .panel,
