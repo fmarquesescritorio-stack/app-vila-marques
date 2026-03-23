@@ -4341,6 +4341,7 @@ function renderBalance() {
   const btnMonthly = document.getElementById("btnBalanceMonthly");
   const btnYearly = document.getElementById("btnBalanceYearly");
   if (!summaryContainer || !contractSummaryContainer || !byResponsibleContainer || !monthlyContainer || !forecastContainer) return;
+  const isMobile = window.matchMedia("(max-width: 840px)").matches;
 
   const entries = [...state.balance.entries].sort(
     (a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime(),
@@ -4451,31 +4452,55 @@ function renderBalance() {
     ? forecast.expectedExpenses
       .sort((a, b) => String(a.dateISO || "").localeCompare(String(b.dateISO || "")))
       .map((item) => `
-        <tr>
-          <td>${escapeHtml(item.type)}</td>
-          <td>${escapeHtml(item.description)}</td>
-          <td>${formatDateBR(item.dateISO)}</td>
-          <td>${escapeHtml(getContractDisplayName(item.contractId))}</td>
-          <td class="balance-expense">${currencyBRL.format(Number(item.amount || 0))}</td>
-        </tr>
+        ${isMobile ? `
+          <article class="mobile-record-card">
+            <div class="mobile-record-grid">
+              <div><span class="small">Tipo</span><strong>${escapeHtml(item.type)}</strong></div>
+              <div><span class="small">Descrição</span><strong>${escapeHtml(item.description)}</strong></div>
+              <div><span class="small">Data prevista</span><strong>${formatDateBR(item.dateISO)}</strong></div>
+              <div><span class="small">Contrato</span><strong>${escapeHtml(getContractDisplayName(item.contractId))}</strong></div>
+              <div><span class="small">Valor</span><strong class="balance-expense">${currencyBRL.format(Number(item.amount || 0))}</strong></div>
+            </div>
+          </article>
+        ` : `
+          <tr>
+            <td>${escapeHtml(item.type)}</td>
+            <td>${escapeHtml(item.description)}</td>
+            <td>${formatDateBR(item.dateISO)}</td>
+            <td>${escapeHtml(getContractDisplayName(item.contractId))}</td>
+            <td class="balance-expense">${currencyBRL.format(Number(item.amount || 0))}</td>
+          </tr>
+        `}
       `)
       .join("")
-    : '<tr><td colspan="5" class="small">Sem despesas previstas automáticas para este mês.</td></tr>';
+    : (isMobile ? '<div class="small">Sem despesas previstas automáticas para este mês.</div>' : '<tr><td colspan="5" class="small">Sem despesas previstas automáticas para este mês.</td></tr>');
 
   const forecastIncomeRows = forecast.expectedIncomes.length
     ? forecast.expectedIncomes
       .sort((a, b) => String(a.dateISO || "").localeCompare(String(b.dateISO || "")))
       .map((item) => `
-        <tr>
-          <td>${escapeHtml(item.clientName || "Não informado")}</td>
-          <td>${escapeHtml(item.description)}</td>
-          <td>${formatDateBR(item.dateISO)}</td>
-          <td>${escapeHtml(getContractDisplayName(item.contractId))}</td>
-          <td class="balance-income">${currencyBRL.format(Number(item.amount || 0))}</td>
-        </tr>
+        ${isMobile ? `
+          <article class="mobile-record-card">
+            <div class="mobile-record-grid">
+              <div><span class="small">Empresa</span><strong>${escapeHtml(item.clientName || "Não informado")}</strong></div>
+              <div><span class="small">Recebimento</span><strong>${escapeHtml(item.description)}</strong></div>
+              <div><span class="small">Data prevista</span><strong>${formatDateBR(item.dateISO)}</strong></div>
+              <div><span class="small">Contrato</span><strong>${escapeHtml(getContractDisplayName(item.contractId))}</strong></div>
+              <div><span class="small">Valor</span><strong class="balance-income">${currencyBRL.format(Number(item.amount || 0))}</strong></div>
+            </div>
+          </article>
+        ` : `
+          <tr>
+            <td>${escapeHtml(item.clientName || "Não informado")}</td>
+            <td>${escapeHtml(item.description)}</td>
+            <td>${formatDateBR(item.dateISO)}</td>
+            <td>${escapeHtml(getContractDisplayName(item.contractId))}</td>
+            <td class="balance-income">${currencyBRL.format(Number(item.amount || 0))}</td>
+          </tr>
+        `}
       `)
       .join("")
-    : '<tr><td colspan="4" class="small">Sem recebimentos previstos automáticos para este mês.</td></tr>';
+    : (isMobile ? '<div class="small">Sem recebimentos previstos automáticos para este mês.</div>' : '<tr><td colspan="4" class="small">Sem recebimentos previstos automáticos para este mês.</td></tr>');
 
   forecastContainer.innerHTML = `
     <article class="yearly-overview">
@@ -4497,30 +4522,35 @@ function renderBalance() {
         <div class="balance-summary-card"><div class="label">Recebimentos confirmados (mês)</div><div class="value balance-income">${currencyBRL.format(confirmedIncomeInMonth)}</div></div>
         <div class="balance-summary-card"><div class="label">Gastos confirmados (mês)</div><div class="value balance-expense">${currencyBRL.format(confirmedExpenseInMonth)}</div></div>
       </div>
-      <table class="balance-table">
-        <thead>
-          <tr>
-            <th>Tipo</th>
-            <th>Despesa prevista</th>
-            <th>Data prevista</th>
-            <th>Contrato</th>
-            <th>Valor</th>
-          </tr>
-        </thead>
-        <tbody>${forecastExpenseRows}</tbody>
-      </table>
-      <table class="balance-table" style="margin-top: 10px;">
-        <thead>
-          <tr>
-            <th>Empresa (cliente)</th>
-            <th>Recebimento previsto</th>
-            <th>Data prevista</th>
-            <th>Contrato</th>
-            <th>Valor</th>
-          </tr>
-        </thead>
-        <tbody>${forecastIncomeRows}</tbody>
-      </table>
+      ${isMobile ? `
+        <div class="mobile-record-list">${forecastExpenseRows}</div>
+        <div class="mobile-record-list" style="margin-top: 10px;">${forecastIncomeRows}</div>
+      ` : `
+        <table class="balance-table">
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Despesa prevista</th>
+              <th>Data prevista</th>
+              <th>Contrato</th>
+              <th>Valor</th>
+            </tr>
+          </thead>
+          <tbody>${forecastExpenseRows}</tbody>
+        </table>
+        <table class="balance-table" style="margin-top: 10px;">
+          <thead>
+            <tr>
+              <th>Empresa (cliente)</th>
+              <th>Recebimento previsto</th>
+              <th>Data prevista</th>
+              <th>Contrato</th>
+              <th>Valor</th>
+            </tr>
+          </thead>
+          <tbody>${forecastIncomeRows}</tbody>
+        </table>
+      `}
     </article>
   `;
 
@@ -4600,13 +4630,25 @@ function renderBalance() {
         const typeLabel = entry.type === "income" ? "Entrada" : "Despesa";
         const typeClass = entry.type === "income" ? "balance-income" : "balance-expense";
         return `
-          <tr>
-            <td>${typeLabel}</td>
-            <td>${escapeHtml(entry.description)}</td>
-            <td>${formatDateTimeBR(entry.dateTime)}</td>
-            <td>${escapeHtml(entry.responsible || "-")}</td>
-            <td class="${typeClass}">${currencyBRL.format(Number(entry.amount || 0))}</td>
-          </tr>
+          ${isMobile ? `
+            <article class="mobile-record-card">
+              <div class="mobile-record-grid">
+                <div><span class="small">Tipo</span><strong>${typeLabel}</strong></div>
+                <div><span class="small">Descrição</span><strong>${escapeHtml(entry.description)}</strong></div>
+                <div><span class="small">Dia e horário</span><strong>${formatDateTimeBR(entry.dateTime)}</strong></div>
+                <div><span class="small">Responsável</span><strong>${escapeHtml(entry.responsible || "-")}</strong></div>
+                <div><span class="small">Valor</span><strong class="${typeClass}">${currencyBRL.format(Number(entry.amount || 0))}</strong></div>
+              </div>
+            </article>
+          ` : `
+            <tr>
+              <td>${typeLabel}</td>
+              <td>${escapeHtml(entry.description)}</td>
+              <td>${formatDateTimeBR(entry.dateTime)}</td>
+              <td>${escapeHtml(entry.responsible || "-")}</td>
+              <td class="${typeClass}">${currencyBRL.format(Number(entry.amount || 0))}</td>
+            </tr>
+          `}
         `;
       })
       .join("");
@@ -4621,18 +4663,22 @@ function renderBalance() {
           <div class="balance-summary-card"><div class="label">Pedágios</div><div class="value balance-expense">${currencyBRL.format(contractToll)}</div></div>
           <div class="balance-summary-card"><div class="label">Lucro</div><div class="value">${currencyBRL.format(contractProfit)}</div></div>
         </div>
-        <table class="balance-table">
-          <thead>
-            <tr>
-              <th>Tipo</th>
-              <th>Descrição</th>
-              <th>Dia e horário</th>
-              <th>Responsável</th>
-              <th>Valor</th>
-            </tr>
-          </thead>
-          <tbody>${contractRows}</tbody>
-        </table>
+        ${isMobile ? `
+          <div class="mobile-record-list">${contractRows}</div>
+        ` : `
+          <table class="balance-table">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Descrição</th>
+                <th>Dia e horário</th>
+                <th>Responsável</th>
+                <th>Valor</th>
+              </tr>
+            </thead>
+            <tbody>${contractRows}</tbody>
+          </table>
+        `}
       </article>
     `;
   }
@@ -4653,15 +4699,31 @@ function renderBalance() {
           const categoryTag = categoryTagLabel ? `<span class="small"> (${escapeHtml(categoryTagLabel)})</span>` : "";
           const responsible = entry.type === "expense" ? escapeHtml(entry.responsible || "-") : "-";
           return `
-            <tr>
-              <td>${typeLabel}</td>
-              <td>${escapeHtml(entry.description)}${fuelTag}${tollTag}${categoryTag}</td>
-              <td>${formatDateTimeBR(entry.dateTime)}</td>
-              <td>${escapeHtml(getContractDisplayName(entry.contractId))}</td>
-              <td>${responsible}</td>
-              <td class="${typeClass}">${currencyBRL.format(entry.amount)}</td>
-              <td><button type="button" class="btn btn-danger btn-remove-balance" data-balance-id="${escapeHtml(entry.id)}">Remover</button></td>
-            </tr>
+            ${isMobile ? `
+              <article class="mobile-record-card">
+                <div class="mobile-record-head">
+                  <strong>${typeLabel}</strong>
+                </div>
+                <div class="mobile-record-grid">
+                  <div><span class="small">Descrição</span><strong>${escapeHtml(entry.description)}${fuelTag}${tollTag}${categoryTag}</strong></div>
+                  <div><span class="small">Dia e horário</span><strong>${formatDateTimeBR(entry.dateTime)}</strong></div>
+                  <div><span class="small">Contrato</span><strong>${escapeHtml(getContractDisplayName(entry.contractId))}</strong></div>
+                  <div><span class="small">Responsável</span><strong>${responsible}</strong></div>
+                  <div><span class="small">Valor</span><strong class="${typeClass}">${currencyBRL.format(entry.amount)}</strong></div>
+                </div>
+                <button type="button" class="btn btn-danger btn-remove-balance" data-balance-id="${escapeHtml(entry.id)}">Remover</button>
+              </article>
+            ` : `
+              <tr>
+                <td>${typeLabel}</td>
+                <td>${escapeHtml(entry.description)}${fuelTag}${tollTag}${categoryTag}</td>
+                <td>${formatDateTimeBR(entry.dateTime)}</td>
+                <td>${escapeHtml(getContractDisplayName(entry.contractId))}</td>
+                <td>${responsible}</td>
+                <td class="${typeClass}">${currencyBRL.format(entry.amount)}</td>
+                <td><button type="button" class="btn btn-danger btn-remove-balance" data-balance-id="${escapeHtml(entry.id)}">Remover</button></td>
+              </tr>
+            `}
           `;
         })
         .join("");
@@ -4672,20 +4734,24 @@ function renderBalance() {
             <div class="month-title">${escapeHtml(summaryTitle)}</div>
             <div class="month-profit">Lucro do mês: ${currencyBRL.format(totalProfit)}</div>
           </div>
-          <table class="balance-table">
-            <thead>
-              <tr>
-                <th>Tipo</th>
-                <th>Descrição</th>
-                <th>Dia e horário</th>
-                <th>Contrato</th>
-                <th>Responsável</th>
-                <th>Valor</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
+          ${isMobile ? `
+            <div class="mobile-record-list">${rows}</div>
+          ` : `
+            <table class="balance-table">
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Descrição</th>
+                  <th>Dia e horário</th>
+                  <th>Contrato</th>
+                  <th>Responsável</th>
+                  <th>Valor</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          `}
         </article>
       `;
   } else {
@@ -4718,14 +4784,29 @@ function renderBalance() {
     const yearlyRows = monthBuckets
       .map(
         (bucket) => `
-          <tr>
-            <td>${monthNameByNumber(bucket.month)}</td>
-            <td class="balance-income">${currencyBRL.format(bucket.income)}</td>
-            <td class="balance-expense">${currencyBRL.format(bucket.expense)}</td>
-            <td class="balance-expense">${currencyBRL.format(bucket.fuelExpense)}</td>
-            <td class="balance-expense">${currencyBRL.format(bucket.tollExpense)}</td>
-            <td>${currencyBRL.format(bucket.profit)}</td>
-          </tr>
+          ${isMobile ? `
+            <article class="mobile-record-card">
+              <div class="mobile-record-head">
+                <strong>${monthNameByNumber(bucket.month)}</strong>
+              </div>
+              <div class="mobile-record-grid">
+                <div><span class="small">Entradas</span><strong class="balance-income">${currencyBRL.format(bucket.income)}</strong></div>
+                <div><span class="small">Despesas</span><strong class="balance-expense">${currencyBRL.format(bucket.expense)}</strong></div>
+                <div><span class="small">Combustível</span><strong class="balance-expense">${currencyBRL.format(bucket.fuelExpense)}</strong></div>
+                <div><span class="small">Pedágios</span><strong class="balance-expense">${currencyBRL.format(bucket.tollExpense)}</strong></div>
+                <div><span class="small">Lucro</span><strong>${currencyBRL.format(bucket.profit)}</strong></div>
+              </div>
+            </article>
+          ` : `
+            <tr>
+              <td>${monthNameByNumber(bucket.month)}</td>
+              <td class="balance-income">${currencyBRL.format(bucket.income)}</td>
+              <td class="balance-expense">${currencyBRL.format(bucket.expense)}</td>
+              <td class="balance-expense">${currencyBRL.format(bucket.fuelExpense)}</td>
+              <td class="balance-expense">${currencyBRL.format(bucket.tollExpense)}</td>
+              <td>${currencyBRL.format(bucket.profit)}</td>
+            </tr>
+          `}
         `,
       )
       .join("");
@@ -4733,19 +4814,23 @@ function renderBalance() {
     monthlyContainer.innerHTML = `
       <article class="yearly-overview">
         <h4>Panorama Anual ${uiState.balanceYear}</h4>
-        <table class="balance-table">
-          <thead>
-            <tr>
-              <th>Mês</th>
-              <th>Entradas</th>
-              <th>Despesas</th>
-              <th>Combustível</th>
-              <th>Pedágios</th>
-              <th>Lucro</th>
-            </tr>
-          </thead>
-          <tbody>${yearlyRows}</tbody>
-        </table>
+        ${isMobile ? `
+          <div class="mobile-record-list">${yearlyRows}</div>
+        ` : `
+          <table class="balance-table">
+            <thead>
+              <tr>
+                <th>Mês</th>
+                <th>Entradas</th>
+                <th>Despesas</th>
+                <th>Combustível</th>
+                <th>Pedágios</th>
+                <th>Lucro</th>
+              </tr>
+            </thead>
+            <tbody>${yearlyRows}</tbody>
+          </table>
+        `}
       </article>
     `;
   }
