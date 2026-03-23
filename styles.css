@@ -1598,10 +1598,21 @@ body.balance-values-blurred #balanceModule .month-profit {
   .balance-grid { grid-template-columns: 1fr; }
   .balance-entry-layout { grid-template-columns: 1fr; }
   .balance-controls { flex-direction: column; align-items: stretch; }
-  .balance-mode-switch { width: 100%; }
+  .balance-mode-switch {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
   .home-greeting { font-size: 20px; }
   .home-modules-grid { grid-template-columns: 1fr; }
-  .balance-mode-switch .btn { flex: 1; }
+  .balance-mode-switch .btn {
+    width: 100%;
+    min-width: 0;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.25;
+  }
   .balance-filters { flex-direction: column; }
   .balance-filters label { min-width: 100%; }
   .balance-summary-grid { grid-template-columns: 1fr; }
@@ -1662,9 +1673,9 @@ body.balance-values-blurred #balanceModule .month-profit {
   #exportsModule .exports-actions .btn,
   #balanceModule .exports-actions .btn {
     white-space: normal;
-    width: auto;
+    width: 100%;
     min-width: 0;
-    flex: 1 1 112px;
+    flex: 1 1 100%;
     padding: 8px 7px;
     font-size: 12px;
   }

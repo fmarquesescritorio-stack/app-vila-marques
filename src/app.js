@@ -4971,6 +4971,7 @@ function exportEmployeeJson(employee) {
 function renderEmployeeCatalog() {
   const container = document.getElementById("employeeCatalogList");
   if (!container) return;
+  const isMobile = window.matchMedia("(max-width: 840px)").matches;
 
   const sorted = [...(state.payslipEmployees || [])]
     .sort((a, b) => a.employeeName.localeCompare(b.employeeName, "pt-BR"));
@@ -4981,30 +4982,54 @@ function renderEmployeeCatalog() {
   }
 
   const rows = sorted
-    .map((employee) => `
-      <tr>
-        <td>${escapeHtml(employee.employeeName)}</td>
-        <td>${escapeHtml(employee.employeeCpf || "-")}</td>
-        <td>${escapeHtml(employee.position || "-")}</td>
-        <td>${currencyBRL.format(Number(employee.baseSalary || 0))}</td>
-        <td>${currencyBRL.format(Number(employee.mealAllowanceFixed || 0))}</td>
-        <td>${currencyBRL.format(Number(employee.mealAllowanceDaily || 0))}</td>
-        <td>${escapeHtml(employee.fixedDiscountPercent || "0")}%</td>
-        <td>${escapeHtml(String((employee.documents || []).length))}</td>
-        <td>
-          <div class="exports-actions">
-            <button type="button" class="btn" data-action="view-employee" data-employee-id="${escapeHtml(employee.id)}">Ver</button>
-            ${hasPermission("editEmployees") ? `<button type="button" class="btn" data-action="edit-employee" data-employee-id="${escapeHtml(employee.id)}">Editar</button>` : ""}
-            <button type="button" class="btn" data-action="use-employee" data-employee-id="${escapeHtml(employee.id)}">Usar no contracheque</button>
-            <button type="button" class="btn" data-action="export-employee" data-employee-id="${escapeHtml(employee.id)}">Exportar</button>
-            ${hasPermission("editEmployees") ? `<button type="button" class="btn btn-danger" data-action="delete-employee" data-employee-id="${escapeHtml(employee.id)}">Apagar</button>` : ""}
-          </div>
-        </td>
-      </tr>
-    `)
+    .map((employee) => {
+      const actionsHtml = `
+        <div class="exports-actions">
+          <button type="button" class="btn" data-action="view-employee" data-employee-id="${escapeHtml(employee.id)}">Ver</button>
+          ${hasPermission("editEmployees") ? `<button type="button" class="btn" data-action="edit-employee" data-employee-id="${escapeHtml(employee.id)}">Editar</button>` : ""}
+          <button type="button" class="btn" data-action="use-employee" data-employee-id="${escapeHtml(employee.id)}">Usar no contracheque</button>
+          <button type="button" class="btn" data-action="export-employee" data-employee-id="${escapeHtml(employee.id)}">Exportar</button>
+          ${hasPermission("editEmployees") ? `<button type="button" class="btn btn-danger" data-action="delete-employee" data-employee-id="${escapeHtml(employee.id)}">Apagar</button>` : ""}
+        </div>
+      `;
+      if (isMobile) {
+        return `
+          <article class="mobile-record-card">
+            <div class="mobile-record-head">
+              <strong>${escapeHtml(employee.employeeName)}</strong>
+              <span class="small">${escapeHtml(employee.employeeCpf || "-")}</span>
+            </div>
+            <div class="mobile-record-grid">
+              <div><span class="small">Cargo</span><strong>${escapeHtml(employee.position || "-")}</strong></div>
+              <div><span class="small">Salário base</span><strong>${currencyBRL.format(Number(employee.baseSalary || 0))}</strong></div>
+              <div><span class="small">VA fixo</span><strong>${currencyBRL.format(Number(employee.mealAllowanceFixed || 0))}</strong></div>
+              <div><span class="small">VA diário</span><strong>${currencyBRL.format(Number(employee.mealAllowanceDaily || 0))}</strong></div>
+              <div><span class="small">Desconto fixo</span><strong>${escapeHtml(employee.fixedDiscountPercent || "0")}%</strong></div>
+              <div><span class="small">Anexos</span><strong>${escapeHtml(String((employee.documents || []).length))}</strong></div>
+            </div>
+            ${actionsHtml}
+          </article>
+        `;
+      }
+      return `
+        <tr>
+          <td>${escapeHtml(employee.employeeName)}</td>
+          <td>${escapeHtml(employee.employeeCpf || "-")}</td>
+          <td>${escapeHtml(employee.position || "-")}</td>
+          <td>${currencyBRL.format(Number(employee.baseSalary || 0))}</td>
+          <td>${currencyBRL.format(Number(employee.mealAllowanceFixed || 0))}</td>
+          <td>${currencyBRL.format(Number(employee.mealAllowanceDaily || 0))}</td>
+          <td>${escapeHtml(employee.fixedDiscountPercent || "0")}%</td>
+          <td>${escapeHtml(String((employee.documents || []).length))}</td>
+          <td>${actionsHtml}</td>
+        </tr>
+      `;
+    })
     .join("");
 
-  container.innerHTML = `
+  container.innerHTML = isMobile
+    ? `<div class="mobile-record-list">${rows}</div>`
+    : `
     <table class="balance-table">
       <thead>
         <tr>
@@ -5788,6 +5813,7 @@ function setClientCatalogForm(client) {
 function renderClientCatalog() {
   const container = document.getElementById("clientCatalogList");
   if (!container) return;
+  const isMobile = window.matchMedia("(max-width: 840px)").matches;
   const sorted = [...(state.clients || [])].sort((a, b) => a.clientName.localeCompare(b.clientName, "pt-BR"));
   if (!sorted.length) {
     container.innerHTML = '<div class="small">Nenhum cliente cadastrado ainda.</div>';
@@ -5795,26 +5821,47 @@ function renderClientCatalog() {
   }
 
   const rows = sorted
-    .map((client) => `
-      <tr>
-        <td>${escapeHtml(client.clientName || "-")}</td>
-        <td>${escapeHtml(client.clientCnpj || "-")}</td>
-        <td>${escapeHtml(client.clientContact || "-")}</td>
-        <td>${escapeHtml(client.clientPhone || "-")}</td>
-        <td>${escapeHtml(client.clientCity || "-")}</td>
-        <td>
-          <div class="exports-actions">
-            <button type="button" class="btn" data-action="view-client" data-client-id="${escapeHtml(client.id)}">Ver</button>
-            ${hasPermission("editClients") ? `<button type="button" class="btn" data-action="edit-client" data-client-id="${escapeHtml(client.id)}">Editar</button>` : ""}
-            <button type="button" class="btn" data-action="use-client-proposal" data-client-id="${escapeHtml(client.id)}">Usar na proposta</button>
-            ${hasPermission("editClients") ? `<button type="button" class="btn btn-danger" data-action="delete-client" data-client-id="${escapeHtml(client.id)}">Apagar</button>` : ""}
-          </div>
-        </td>
-      </tr>
-    `)
+    .map((client) => {
+      const actionsHtml = `
+        <div class="exports-actions">
+          <button type="button" class="btn" data-action="view-client" data-client-id="${escapeHtml(client.id)}">Ver</button>
+          ${hasPermission("editClients") ? `<button type="button" class="btn" data-action="edit-client" data-client-id="${escapeHtml(client.id)}">Editar</button>` : ""}
+          <button type="button" class="btn" data-action="use-client-proposal" data-client-id="${escapeHtml(client.id)}">Usar na proposta</button>
+          ${hasPermission("editClients") ? `<button type="button" class="btn btn-danger" data-action="delete-client" data-client-id="${escapeHtml(client.id)}">Apagar</button>` : ""}
+        </div>
+      `;
+      if (isMobile) {
+        return `
+          <article class="mobile-record-card">
+            <div class="mobile-record-head">
+              <strong>${escapeHtml(client.clientName || "-")}</strong>
+            </div>
+            <div class="mobile-record-grid">
+              <div><span class="small">CNPJ</span><strong>${escapeHtml(client.clientCnpj || "-")}</strong></div>
+              <div><span class="small">Contato</span><strong>${escapeHtml(client.clientContact || "-")}</strong></div>
+              <div><span class="small">Celular</span><strong>${escapeHtml(client.clientPhone || "-")}</strong></div>
+              <div><span class="small">Cidade</span><strong>${escapeHtml(client.clientCity || "-")}</strong></div>
+            </div>
+            ${actionsHtml}
+          </article>
+        `;
+      }
+      return `
+        <tr>
+          <td>${escapeHtml(client.clientName || "-")}</td>
+          <td>${escapeHtml(client.clientCnpj || "-")}</td>
+          <td>${escapeHtml(client.clientContact || "-")}</td>
+          <td>${escapeHtml(client.clientPhone || "-")}</td>
+          <td>${escapeHtml(client.clientCity || "-")}</td>
+          <td>${actionsHtml}</td>
+        </tr>
+      `;
+    })
     .join("");
 
-  container.innerHTML = `
+  container.innerHTML = isMobile
+    ? `<div class="mobile-record-list">${rows}</div>`
+    : `
     <table class="balance-table">
       <thead>
         <tr>
@@ -6507,6 +6554,7 @@ function renderContracts() {
       : '<div class="small">Nenhum contrato em rascunho.</div>';
     return;
   }
+  const isMobile = window.matchMedia("(max-width: 840px)").matches;
 
   const rows = filtered
     .map(({ item, result }) => {
@@ -6514,6 +6562,32 @@ function renderContracts() {
       const isVisible = Boolean(uiState.contractsVisibleValuesById?.[item.id]);
       const nextReceiptISO = getContractNextReceiptDateISO(item);
       const overdueTag = isContractOverdue(item) ? '<span class="tag-overdue">Atrasado</span>' : "";
+      const actionsHtml = `
+        <div class="exports-actions">
+          <button type="button" class="btn contracts-eye-btn" data-action="toggle-contract-values" data-contract-id="${escapeHtml(item.id)}" title="${isVisible ? "Ocultar valores" : "Mostrar valores"}" aria-label="${isVisible ? "Ocultar valores" : "Mostrar valores"}">${isVisible ? "◉" : "◎"}</button>
+          ${hasPermission("editContracts") ? `<button type="button" class="btn" data-action="edit-contract" data-contract-id="${escapeHtml(item.id)}">Editar</button>` : ""}
+          <button type="button" class="btn" data-action="open-contract" data-contract-id="${escapeHtml(item.id)}">Abrir</button>
+          ${hasPermission("editContracts") ? `<button type="button" class="btn btn-danger" data-action="delete-contract" data-contract-id="${escapeHtml(item.id)}">Excluir</button>` : ""}
+        </div>
+      `;
+      if (isMobile) {
+        return `
+          <article class="mobile-record-card">
+            <div class="mobile-record-head">
+              <strong>${escapeHtml(item.contractName || "Sem nome")}</strong>
+              ${overdueTag}
+            </div>
+            <div class="mobile-record-grid">
+              <div><span class="small">Cliente</span><strong>${escapeHtml(clientName)}</strong></div>
+              <div><span class="small">Próx. recebimento</span><strong>${formatDateBR(nextReceiptISO)}</strong></div>
+              <div><span class="small">Faturamento mensal</span><strong class="contracts-sensitive-value ${isVisible ? "" : "contracts-sensitive-value-hidden"} balance-income">${currencyBRL.format(result.monthlyRevenue)}</strong></div>
+              <div><span class="small">Lucro mensal</span><strong class="contracts-sensitive-value ${isVisible ? "" : "contracts-sensitive-value-hidden"} ${result.monthlyProfit >= 0 ? "balance-income" : "balance-expense"}">${currencyBRL.format(result.monthlyProfit)}</strong></div>
+              <div><span class="small">Atualizado em</span><strong>${formatDateTimeBR(item.updatedAt)}</strong></div>
+            </div>
+            ${actionsHtml}
+          </article>
+        `;
+      }
       return `
       <tr>
         <td>${escapeHtml(item.contractName || "Sem nome")}</td>
@@ -6522,20 +6596,15 @@ function renderContracts() {
         <td class="contracts-sensitive-value ${isVisible ? "" : "contracts-sensitive-value-hidden"} balance-income">${currencyBRL.format(result.monthlyRevenue)}</td>
         <td class="contracts-sensitive-value ${isVisible ? "" : "contracts-sensitive-value-hidden"} ${result.monthlyProfit >= 0 ? "balance-income" : "balance-expense"}">${currencyBRL.format(result.monthlyProfit)}</td>
         <td>${formatDateTimeBR(item.updatedAt)}</td>
-        <td>
-          <div class="exports-actions">
-            <button type="button" class="btn contracts-eye-btn" data-action="toggle-contract-values" data-contract-id="${escapeHtml(item.id)}" title="${isVisible ? "Ocultar valores" : "Mostrar valores"}" aria-label="${isVisible ? "Ocultar valores" : "Mostrar valores"}">${isVisible ? "◉" : "◎"}</button>
-            ${hasPermission("editContracts") ? `<button type="button" class="btn" data-action="edit-contract" data-contract-id="${escapeHtml(item.id)}">Editar</button>` : ""}
-            <button type="button" class="btn" data-action="open-contract" data-contract-id="${escapeHtml(item.id)}">Abrir</button>
-            ${hasPermission("editContracts") ? `<button type="button" class="btn btn-danger" data-action="delete-contract" data-contract-id="${escapeHtml(item.id)}">Excluir</button>` : ""}
-          </div>
-        </td>
+        <td>${actionsHtml}</td>
       </tr>
     `;
     })
     .join("");
 
-  listContainer.innerHTML = `
+  listContainer.innerHTML = isMobile
+    ? `<div class="mobile-record-list">${rows}</div>`
+    : `
     <table class="balance-table">
       <thead>
         <tr>
