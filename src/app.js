@@ -3996,11 +3996,17 @@ function calculateMonthlySalarySettlement({
 
 function isSalaryExpenseEntryForEmployeeInMonth(entry, employee, year, monthNumber) {
   if (!entry || entry.type !== "expense") return false;
-  const date = new Date(entry.dateTime);
-  if (Number.isNaN(date.getTime())) return false;
-  if (date.getFullYear() !== Number(year) || date.getMonth() + 1 !== Number(monthNumber)) return false;
   const category = resolveExpenseCategory(entry);
   if (category !== "salario") return false;
+  const refYear = Number(entry.referenceYear || 0);
+  const refMonth = Number(entry.referenceMonth || 0);
+  if (refYear > 0 && refMonth > 0) {
+    if (refYear !== Number(year) || refMonth !== Number(monthNumber)) return false;
+  } else {
+    const date = new Date(entry.dateTime);
+    if (Number.isNaN(date.getTime())) return false;
+    if (date.getFullYear() !== Number(year) || date.getMonth() + 1 !== Number(monthNumber)) return false;
+  }
   const employeeId = String(employee?.id || "").trim();
   if (employeeId && String(entry.employeeId || "").trim() === employeeId) return true;
   const employeeName = String(employee?.employeeName || "").trim().toLowerCase();
@@ -8527,6 +8533,8 @@ function bindEvents() {
         description: `Salário líquido mensal - ${employeeName} (${monthNameByNumber(reference.month)}/${reference.year})`,
         amount: Number(settlement.netCashValue || 0),
         dateTime: `${toISODateOnly(paymentDate)}T12:00`,
+        referenceYear: Number(reference.year),
+        referenceMonth: Number(reference.month),
         responsible: "",
         contractId: "",
         category: "salario",
