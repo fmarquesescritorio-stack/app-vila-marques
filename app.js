@@ -8503,9 +8503,10 @@ function bindEvents() {
         return;
       }
 
-      const duplicateSalary = (state.balance.entries || []).some((entry) =>
-        isSalaryExpenseEntryForEmployeeInMonth(entry, employee, reference.year, reference.month),
-      );
+      const duplicateSalary = (employee.salaryHistory || []).some((item) => (
+        Number(item.referenceYear || 0) === Number(reference.year)
+        && Number(item.referenceMonth || 0) === Number(reference.month)
+      ));
       if (duplicateSalary) {
         alert("Já existe pagamento de salário deste funcionário no mês selecionado. Remova o lançamento antigo antes de registrar outro.");
         return;
