@@ -4202,7 +4202,35 @@ function buildBalanceMonthlyForecast(year, monthNumber) {
 async function removeBalanceEntryById(id) {
   const index = state.balance.entries.findIndex((entry) => entry.id === id);
   if (index >= 0) {
-    state.balance.entries.splice(index, 1);
+    const [removedEntry] = state.balance.entries.splice(index, 1);
+    if (removedEntry && resolveExpenseCategory(removedEntry) === "salario") {
+      const employeeId = String(removedEntry.employeeId || "").trim();
+      const employeeIndex = (state.payslipEmployees || []).findIndex((item) => item.id === employeeId);
+      if (employeeIndex >= 0) {
+        const employee = state.payslipEmployees[employeeIndex];
+        const history = Array.isArray(employee.salaryHistory) ? [...employee.salaryHistory] : [];
+        const salaryHistoryId = String(removedEntry.salaryHistoryId || "").trim();
+        const paymentDateISO = String(removedEntry.dateTime || "").split("T")[0];
+        const refYear = Number(removedEntry.referenceYear || 0);
+        const refMonth = Number(removedEntry.referenceMonth || 0);
+        const entryAmount = Number(removedEntry.amount || 0);
+        const filtered = history.filter((item) => {
+          if (salaryHistoryId && String(item.id || "") === salaryHistoryId) return false;
+          const sameReference = refYear > 0
+            && refMonth > 0
+            && Number(item.referenceYear || 0) === refYear
+            && Number(item.referenceMonth || 0) === refMonth;
+          const sameDate = paymentDateISO && String(item.paymentDateISO || "") === paymentDateISO;
+          const sameValue = Math.abs(Number(item.netCashValue || 0) - entryAmount) < 0.01;
+          if (sameReference && sameDate && sameValue) return false;
+          return true;
+        });
+        state.payslipEmployees[employeeIndex] = {
+          ...employee,
+          salaryHistory: filtered,
+        };
+      }
+    }
     await saveStateAndCloudNow();
     renderBalance();
   }
@@ -8527,6 +8555,7 @@ function bindEvents() {
         confederativeDiscountPercent,
         mealAllowanceDiscountPercent,
       });
+      const salaryHistoryId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const employeeName = String(employee.employeeName || "Funcionário").trim() || "Funcionário";
       const entry = {
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -8540,6 +8569,7 @@ function bindEvents() {
         contractId: "",
         category: "salario",
         employeeId,
+        salaryHistoryId,
         linkedContractPaymentId: "",
         linkedRentedPropertyPaymentId: "",
       };
@@ -8550,7 +8580,7 @@ function bindEvents() {
         const currentEmployee = state.payslipEmployees[employeeIndex];
         const salaryHistory = Array.isArray(currentEmployee.salaryHistory) ? [...currentEmployee.salaryHistory] : [];
         salaryHistory.push({
-          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          id: salaryHistoryId,
           paymentDateISO: toISODateOnly(paymentDate),
           referenceYear: reference.year,
           referenceMonth: reference.month,
