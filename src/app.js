@@ -3907,6 +3907,9 @@ function calculateMonthlySalarySettlement({
   businessDaysInMonth,
   absenceDays,
   allowanceDays,
+  inssDiscountValue = 0,
+  confederativeDiscountPercent = 0,
+  mealAllowanceDiscountPercent = 20,
 }) {
   const referenceDateISO = formatYearMonthISO(year, monthNumber)
     ? `${formatYearMonthISO(year, monthNumber)}-01`
@@ -3937,10 +3940,20 @@ function calculateMonthlySalarySettlement({
   const salaryAfterAbsence = Math.max(0, proportionalBaseSalary - absenceSalaryDiscountValue);
   const mealAllowanceDailyTotal = mealAllowanceDaily * workedBusinessDays;
   const mealAllowanceTotal = mealAllowanceDailyTotal;
-  const mealAllowanceCardDiscountPercent = 20;
+  const mealAllowanceCardDiscountPercent = Math.max(0, Number(mealAllowanceDiscountPercent || 0));
   const mealAllowanceCardDiscountValue = mealAllowanceTotal * (mealAllowanceCardDiscountPercent / 100);
+  const normalizedInssDiscountValue = Math.max(0, Number(inssDiscountValue || 0));
+  const normalizedConfederativeDiscountPercent = Math.max(0, Number(confederativeDiscountPercent || 0));
+  const confederativeDiscountValue = baseSalary * (normalizedConfederativeDiscountPercent / 100);
   const fixedDiscountValue = salaryAfterAbsence * (fixedDiscountPercent / 100);
-  const netCashValue = salaryAfterAbsence - fixedDiscountValue - mealAllowanceCardDiscountValue;
+  const netCashValue = Math.max(
+    0,
+    salaryAfterAbsence
+      - fixedDiscountValue
+      - mealAllowanceCardDiscountValue
+      - normalizedInssDiscountValue
+      - confederativeDiscountValue,
+  );
   const totalReceivedValue = netCashValue + mealAllowanceTotal;
 
   return {
@@ -3965,6 +3978,9 @@ function calculateMonthlySalarySettlement({
     mealAllowanceTotal,
     mealAllowanceCardDiscountPercent,
     mealAllowanceCardDiscountValue,
+    inssDiscountValue: normalizedInssDiscountValue,
+    confederativeDiscountPercent: normalizedConfederativeDiscountPercent,
+    confederativeDiscountValue,
     fixedDiscountPercent,
     fixedDiscountValue,
     netCashValue,
@@ -4271,6 +4287,7 @@ function applySalaryPaymentFormDefaults({ forceReferenceFromPaymentDate = false 
   }
   const absenceInput = form.elements.namedItem("absenceDays");
   const allowanceInput = form.elements.namedItem("allowanceDays");
+  const mealAllowanceDiscountInput = form.elements.namedItem("mealAllowanceDiscountPercent");
   const absenceJustificationInput = form.elements.namedItem("absenceJustification");
   const allowanceJustificationInput = form.elements.namedItem("allowanceJustification");
   const absenceDays = Math.max(0, Number(absenceInput?.value || 0));
@@ -4282,6 +4299,9 @@ function applySalaryPaymentFormDefaults({ forceReferenceFromPaymentDate = false 
   if (allowanceJustificationInput) {
     allowanceJustificationInput.required = allowanceDays > 0;
     if (allowanceDays <= 0) allowanceJustificationInput.value = "";
+  }
+  if (mealAllowanceDiscountInput && String(mealAllowanceDiscountInput.value || "").trim() === "") {
+    mealAllowanceDiscountInput.value = "20";
   }
 }
 
@@ -4335,13 +4355,17 @@ function renderSalaryPaymentPreview() {
     businessDaysInMonth: businessDaysByRange,
     absenceDays: Number(data.absenceDays || 0),
     allowanceDays: Number(data.allowanceDays || 0),
+    inssDiscountValue: parseBRLNumber(data.inssDiscountValue || 0),
+    confederativeDiscountPercent: Number(data.confederativeDiscountPercent || 0),
+    mealAllowanceDiscountPercent: Number(data.mealAllowanceDiscountPercent || 20),
   });
 
   preview.innerHTML = `
     <strong>Prévia (${escapeHtml(monthNameByNumber(reference.month))}/${reference.year})</strong><br />
     Salário base: ${currencyBRL.format(settlement.baseSalary)} | Salário após faltas: ${currencyBRL.format(settlement.salaryAfterAbsence)}<br />
-    VA total (cartão): ${currencyBRL.format(settlement.mealAllowanceTotal)} | Coparticipação VA (${settlement.mealAllowanceCardDiscountPercent}%): ${currencyBRL.format(settlement.mealAllowanceCardDiscountValue)}<br />
-    Salário líquido: ${currencyBRL.format(settlement.netCashValue)} | Custo total recebido no mês: <strong>${currencyBRL.format(settlement.totalReceivedValue)}</strong>
+    VA total (cartão): ${currencyBRL.format(settlement.mealAllowanceTotal)} | Desconto VA (${settlement.mealAllowanceCardDiscountPercent}%): ${currencyBRL.format(settlement.mealAllowanceCardDiscountValue)}<br />
+    INSS: ${currencyBRL.format(settlement.inssDiscountValue)} | Contribuição confederativa (${settlement.confederativeDiscountPercent}%): ${currencyBRL.format(settlement.confederativeDiscountValue)}<br />
+    Salário líquido (lançado no balanço): <strong>${currencyBRL.format(settlement.netCashValue)}</strong>
   `;
 }
 
@@ -5055,6 +5079,10 @@ function exportEmployeeJson(employee) {
       justificativaAbonos: item.allowanceJustification,
       salarioAposFaltas: Number(item.salaryAfterAbsence || 0),
       valeAlimentacaoTotal: Number(item.mealAllowanceTotal || 0),
+      descontoINSS: Number(item.inssDiscountValue || 0),
+      contribuicaoConfederativaPercentual: Number(item.confederativeDiscountPercent || 0),
+      contribuicaoConfederativaValor: Number(item.confederativeDiscountValue || 0),
+      descontoValePercentual: Number(item.mealAllowanceDiscountPercent || 20),
       coparticipacaoVale: Number(item.mealAllowanceCardDiscountValue || 0),
       salarioLiquido: Number(item.netCashValue || 0),
       totalRecebido: Number(item.totalReceivedValue || 0),
@@ -5254,21 +5282,28 @@ function renderEmployeeDetailsView() {
         <td>${escapeHtml(String(item.allowanceDays || 0))}</td>
         <td>${escapeHtml(item.absenceJustification || "-")}</td>
         <td>${escapeHtml(item.allowanceJustification || "-")}</td>
-        <td>${currencyBRL.format(Number(item.totalReceivedValue || 0))}</td>
+        <td>${currencyBRL.format(Number(item.inssDiscountValue || 0))}</td>
+        <td>${escapeHtml(String(item.confederativeDiscountPercent || 0))}% (${currencyBRL.format(Number(item.confederativeDiscountValue || 0))})</td>
+        <td>${escapeHtml(String(item.mealAllowanceDiscountPercent || 20))}% (${currencyBRL.format(Number(item.mealAllowanceCardDiscountValue || 0))})</td>
+        <td>${currencyBRL.format(Number(item.netCashValue || 0))}</td>
       </tr>
     `)
     .join("");
   const salarySummary = salaryHistory.reduce((acc, item) => {
-    acc.totalPaid += Number(item.totalReceivedValue || 0);
+    acc.totalPaid += Number(item.netCashValue || 0);
     acc.totalSalary += Number(item.salaryAfterAbsence || 0);
     acc.totalVA += Number(item.mealAllowanceTotal || 0);
     acc.totalCardDiscount += Number(item.mealAllowanceCardDiscountValue || 0);
+    acc.totalInss += Number(item.inssDiscountValue || 0);
+    acc.totalConfederative += Number(item.confederativeDiscountValue || 0);
     return acc;
   }, {
     totalPaid: 0,
     totalSalary: 0,
     totalVA: 0,
     totalCardDiscount: 0,
+    totalInss: 0,
+    totalConfederative: 0,
   });
   container.innerHTML = `
     <h3 style="margin-top: 0;">Visualização de Funcionário</h3>
@@ -5303,13 +5338,16 @@ function renderEmployeeDetailsView() {
             <th>Abonos</th>
             <th>Justificativa faltas</th>
             <th>Justificativa abonos</th>
-            <th>Total recebido</th>
+            <th>INSS</th>
+            <th>Contrib. confed.</th>
+            <th>Desc. VA</th>
+            <th>Salário líquido</th>
           </tr>
         </thead>
         <tbody>${salaryRows}</tbody>
       </table>
       <div class="small" style="margin-top: 8px;">
-        <strong>Resumo:</strong> ${salaryHistory.length} pagamento(s) | Salário total: ${currencyBRL.format(salarySummary.totalSalary)} | VA total: ${currencyBRL.format(salarySummary.totalVA)} | Coparticipação VA: ${currencyBRL.format(salarySummary.totalCardDiscount)} | Total recebido: ${currencyBRL.format(salarySummary.totalPaid)}
+        <strong>Resumo:</strong> ${salaryHistory.length} pagamento(s) | Salário base apurado: ${currencyBRL.format(salarySummary.totalSalary)} | VA total: ${currencyBRL.format(salarySummary.totalVA)} | INSS: ${currencyBRL.format(salarySummary.totalInss)} | Contrib. confed.: ${currencyBRL.format(salarySummary.totalConfederative)} | Desc. VA: ${currencyBRL.format(salarySummary.totalCardDiscount)} | Salário líquido pago: ${currencyBRL.format(salarySummary.totalPaid)}
       </div>
     ` : '<div class="small">Nenhum pagamento salarial registrado para este funcionário.</div>'}
   `;
@@ -6959,6 +6997,7 @@ function renderAll() {
   setupBRLInputs(document.getElementById("discountForm"));
   setupBRLInputs(document.getElementById("incomeForm"));
   setupBRLInputs(document.getElementById("expenseForm"));
+  setupBRLInputs(document.getElementById("salaryPaymentForm"));
   setupBRLInputs(document.getElementById("rentedPropertyForm"));
   renderPendingEmployeeDocuments();
   renderProposalPhotosList();
@@ -8412,6 +8451,9 @@ function bindEvents() {
       );
       const absenceDays = Math.max(0, Number(data.absenceDays || 0));
       const allowanceDays = Math.max(0, Number(data.allowanceDays || 0));
+      const inssDiscountValue = Math.max(0, parseBRLNumber(data.inssDiscountValue || 0));
+      const confederativeDiscountPercent = Math.max(0, Number(data.confederativeDiscountPercent || 0));
+      const mealAllowanceDiscountPercent = Math.max(0, Number(data.mealAllowanceDiscountPercent || 20));
       const absenceJustification = String(data.absenceJustification || "").trim();
       const allowanceJustification = String(data.allowanceJustification || "").trim();
       if (absenceDays > businessDaysInMonth) {
@@ -8449,13 +8491,16 @@ function bindEvents() {
         businessDaysInMonth,
         absenceDays,
         allowanceDays,
+        inssDiscountValue,
+        confederativeDiscountPercent,
+        mealAllowanceDiscountPercent,
       });
       const employeeName = String(employee.employeeName || "Funcionário").trim() || "Funcionário";
       const entry = {
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         type: "expense",
-        description: `Salário mensal - ${employeeName} (${monthNameByNumber(reference.month)}/${reference.year})`,
-        amount: Number(settlement.totalReceivedValue || 0),
+        description: `Salário líquido mensal - ${employeeName} (${monthNameByNumber(reference.month)}/${reference.year})`,
+        amount: Number(settlement.netCashValue || 0),
         dateTime: `${toISODateOnly(paymentDate)}T12:00`,
         responsible: "",
         contractId: "",
@@ -8484,6 +8529,10 @@ function bindEvents() {
           allowanceJustification: settlement.allowanceDays > 0 ? allowanceJustification : "",
           salaryAfterAbsence: settlement.salaryAfterAbsence,
           mealAllowanceTotal: settlement.mealAllowanceTotal,
+          inssDiscountValue: settlement.inssDiscountValue,
+          confederativeDiscountPercent: settlement.confederativeDiscountPercent,
+          confederativeDiscountValue: settlement.confederativeDiscountValue,
+          mealAllowanceDiscountPercent: settlement.mealAllowanceCardDiscountPercent,
           mealAllowanceCardDiscountValue: settlement.mealAllowanceCardDiscountValue,
           netCashValue: settlement.netCashValue,
           totalReceivedValue: settlement.totalReceivedValue,
@@ -8521,6 +8570,10 @@ function bindEvents() {
           allowanceJustification: settlement.allowanceDays > 0 ? allowanceJustification : "",
           unexcusedAbsenceDays: settlement.unexcusedAbsenceDays,
           mealAllowanceTotal: settlement.mealAllowanceTotal,
+          inssDiscountValue: settlement.inssDiscountValue,
+          confederativeDiscountPercent: settlement.confederativeDiscountPercent,
+          confederativeDiscountValue: settlement.confederativeDiscountValue,
+          mealAllowanceDiscountPercent: settlement.mealAllowanceCardDiscountPercent,
           mealAllowanceCardDiscountValue: settlement.mealAllowanceCardDiscountValue,
           netCashValue: settlement.netCashValue,
           totalReceivedValue: settlement.totalReceivedValue,

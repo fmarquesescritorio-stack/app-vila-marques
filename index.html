@@ -587,6 +587,15 @@
                 <label>Abonos
                   <input name="allowanceDays" type="number" min="0" value="0" required />
                 </label>
+                <label>Desconto INSS (R$)
+                  <input name="inssDiscountValue" data-brl inputmode="numeric" value="R$ 0,00" />
+                </label>
+                <label>Contribuição confederativa (% sobre salário base)
+                  <input name="confederativeDiscountPercent" type="number" min="0" step="0.01" value="0" />
+                </label>
+                <label>Desconto VA (% sobre VA total)
+                  <input name="mealAllowanceDiscountPercent" type="number" min="0" step="0.01" value="20" />
+                </label>
                 <label class="full">Justificativa dos abonos
                   <input name="allowanceJustification" placeholder="Obrigatório quando houver abonos" />
                 </label>
