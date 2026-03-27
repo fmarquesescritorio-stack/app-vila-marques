@@ -3415,8 +3415,22 @@ async function exportProposalAsPdfFile(proposalDocNode) {
   if (!proposalDocNode) return false;
   const hasLib = await ensureHtml2PdfBundle();
   if (!hasLib || !window.html2pdf) return false;
-  await waitForProposalRenderReady(proposalDocNode);
-  proposalDocNode.classList.add("proposal-doc-pdf");
+  const isolatedWrapper = document.createElement("div");
+  isolatedWrapper.style.position = "fixed";
+  isolatedWrapper.style.left = "-100000px";
+  isolatedWrapper.style.top = "0";
+  isolatedWrapper.style.width = "210mm";
+  isolatedWrapper.style.padding = "0";
+  isolatedWrapper.style.margin = "0";
+  isolatedWrapper.style.background = "#fff";
+  isolatedWrapper.style.zIndex = "-1";
+
+  const isolatedDoc = proposalDocNode.cloneNode(true);
+  isolatedDoc.classList.add("proposal-doc-pdf");
+  isolatedWrapper.appendChild(isolatedDoc);
+  document.body.appendChild(isolatedWrapper);
+
+  await waitForProposalRenderReady(isolatedDoc);
 
   const companyName = sanitizeFilenamePart(state.company?.name || "Sem empresa", "Sem empresa");
   const issueDate = String(state.proposal?.issueDate || "").trim();
@@ -3428,7 +3442,7 @@ async function exportProposalAsPdfFile(proposalDocNode) {
   const filename = `Proposta Comercial - ${companyName} - ${monthYear} - A C ${contactName}.pdf`;
 
   try {
-    const canvasWidth = Math.max(1120, Math.ceil(proposalDocNode.scrollWidth || 1120));
+    const canvasWidth = Math.max(1120, Math.ceil(isolatedDoc.scrollWidth || 1120));
     await window.html2pdf()
       .set({
         margin: [10, 10, 10, 10],
@@ -3444,13 +3458,13 @@ async function exportProposalAsPdfFile(proposalDocNode) {
         },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
       })
-      .from(proposalDocNode)
+      .from(isolatedDoc)
       .save();
     return true;
   } catch (_error) {
     return false;
   } finally {
-    proposalDocNode.classList.remove("proposal-doc-pdf");
+    isolatedWrapper.remove();
   }
 }
 
