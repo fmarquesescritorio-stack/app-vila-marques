@@ -3417,13 +3417,16 @@ async function exportProposalAsPdfFile(proposalDocNode) {
   if (!hasLib || !window.html2pdf) return false;
   const isolatedWrapper = document.createElement("div");
   isolatedWrapper.style.position = "fixed";
-  isolatedWrapper.style.left = "-100000px";
+  isolatedWrapper.style.left = "0";
   isolatedWrapper.style.top = "0";
   isolatedWrapper.style.width = "210mm";
   isolatedWrapper.style.padding = "0";
   isolatedWrapper.style.margin = "0";
   isolatedWrapper.style.background = "#fff";
+  isolatedWrapper.style.opacity = "0";
+  isolatedWrapper.style.pointerEvents = "none";
   isolatedWrapper.style.zIndex = "-1";
+  isolatedWrapper.style.overflow = "hidden";
 
   const isolatedDoc = proposalDocNode.cloneNode(true);
   isolatedDoc.classList.add("proposal-doc-pdf");
