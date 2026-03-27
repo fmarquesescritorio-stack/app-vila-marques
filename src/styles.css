@@ -685,14 +685,15 @@ input:focus, select:focus, textarea:focus {
 }
 
 .proposal-doc.proposal-doc-pdf {
-  width: 190mm;
-  max-width: 190mm;
+  width: 188mm;
+  max-width: 188mm;
   margin: 0 auto;
   border: 0;
   border-radius: 0;
   box-shadow: none;
   overflow: visible;
   background: #fff;
+  box-sizing: border-box;
 }
 
 .proposal-doc.proposal-doc-pdf .doc-header {
@@ -711,6 +712,8 @@ input:focus, select:focus, textarea:focus {
 .proposal-doc.proposal-doc-pdf .doc-table td {
   padding: 6px 8px;
   font-size: 12px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .proposal-doc.proposal-doc-pdf .doc-row {

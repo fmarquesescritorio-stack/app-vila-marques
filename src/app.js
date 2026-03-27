@@ -3428,16 +3428,17 @@ async function exportProposalAsPdfFile(proposalDocNode) {
   const filename = `Proposta Comercial - ${companyName} - ${monthYear} - A C ${contactName}.pdf`;
 
   try {
+    const canvasWidth = Math.max(1120, Math.ceil(proposalDocNode.scrollWidth || 1120));
     await window.html2pdf()
       .set({
-        margin: [12, 10, 14, 10],
+        margin: [10, 10, 10, 10],
         filename,
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: {
-          scale: 2,
+          scale: 2.2,
           useCORS: true,
           backgroundColor: "#ffffff",
-          windowWidth: 1440,
+          windowWidth: canvasWidth,
           scrollX: 0,
           scrollY: 0,
         },
