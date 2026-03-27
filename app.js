@@ -8579,6 +8579,10 @@ function bindEvents() {
         };
       }
       await saveStateAndCloudNow();
+      uiState.balanceMode = "monthly";
+      uiState.balanceYear = paymentDate.getFullYear();
+      uiState.balanceMonth = paymentDate.getMonth() + 1;
+      uiState.balanceContractId = "";
       void logAuditAction({
         action: "create",
         module: "balance",
@@ -8616,7 +8620,7 @@ function bindEvents() {
         },
       });
       renderBalance();
-      alert("Pagamento mensal de salário registrado no balanço.");
+      alert(`Pagamento mensal de salário registrado no balanço (${monthNameByNumber(uiState.balanceMonth)}/${uiState.balanceYear}).`);
     });
   }
 
