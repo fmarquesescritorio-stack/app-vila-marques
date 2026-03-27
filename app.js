@@ -3430,6 +3430,8 @@ async function exportProposalAsPdfFile(proposalDocNode) {
 
   const isolatedDoc = proposalDocNode.cloneNode(true);
   isolatedDoc.classList.add("proposal-doc-pdf");
+  isolatedDoc.style.margin = "0";
+  isolatedDoc.style.maxWidth = "none";
   isolatedWrapper.appendChild(isolatedDoc);
   document.body.appendChild(isolatedWrapper);
 
@@ -3445,21 +3447,32 @@ async function exportProposalAsPdfFile(proposalDocNode) {
   const filename = `Proposta Comercial - ${companyName} - ${monthYear} - A C ${contactName}.pdf`;
 
   try {
-    const canvasWidth = Math.max(1120, Math.ceil(isolatedDoc.scrollWidth || 1120));
+    const captureRect = isolatedDoc.getBoundingClientRect();
+    const captureWidth = Math.max(900, Math.ceil(captureRect.width || isolatedDoc.scrollWidth || 900));
+    const captureHeight = Math.max(1200, Math.ceil(captureRect.height || isolatedDoc.scrollHeight || 1200));
+    const captureX = Math.max(0, Math.floor(captureRect.left));
+    const captureY = Math.max(0, Math.floor(captureRect.top));
+
     await window.html2pdf()
       .set({
         margin: [10, 10, 10, 10],
         filename,
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: {
-          scale: 2.2,
+          scale: 2,
           useCORS: true,
           backgroundColor: "#ffffff",
-          windowWidth: canvasWidth,
+          width: captureWidth,
+          height: captureHeight,
+          x: captureX,
+          y: captureY,
+          windowWidth: Math.max(1200, captureWidth),
+          windowHeight: Math.max(1600, captureHeight),
           scrollX: 0,
           scrollY: 0,
         },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        pagebreak: { mode: ["css", "legacy"] },
       })
       .from(isolatedDoc)
       .save();
