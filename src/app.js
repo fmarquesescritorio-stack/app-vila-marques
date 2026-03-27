@@ -1004,6 +1004,11 @@ function normalizeStatePatterns() {
               allowanceJustification: String(item.allowanceJustification || "").trim(),
               salaryAfterAbsence: Number(item.salaryAfterAbsence || 0),
               mealAllowanceTotal: Number(item.mealAllowanceTotal || 0),
+              inssDiscountValue: Number(item.inssDiscountValue || 0),
+              fgtsBaseSalary: Number(item.fgtsBaseSalary || 0),
+              confederativeDiscountPercent: Number(item.confederativeDiscountPercent || 0),
+              confederativeDiscountValue: Number(item.confederativeDiscountValue || 0),
+              mealAllowanceDiscountPercent: Number(item.mealAllowanceDiscountPercent || 20),
               mealAllowanceCardDiscountValue: Number(item.mealAllowanceCardDiscountValue || 0),
               netCashValue: Number(item.netCashValue || 0),
               totalReceivedValue: Number(item.totalReceivedValue || 0),
@@ -1079,10 +1084,55 @@ function normalizeStatePatterns() {
     contractId: String(entry.contractId || "").trim(),
     category: String(entry.category || "").trim().toLowerCase(),
     employeeId: String(entry.employeeId || "").trim(),
+    referenceYear: Number(entry.referenceYear || 0),
+    referenceMonth: Number(entry.referenceMonth || 0),
+    salaryHistoryId: String(entry.salaryHistoryId || "").trim(),
+    inssDiscountValue: Number(entry.inssDiscountValue || 0),
+    fgtsBaseSalary: Number(entry.fgtsBaseSalary || 0),
+    confederativeDiscountPercent: Number(entry.confederativeDiscountPercent || 0),
+    confederativeDiscountValue: Number(entry.confederativeDiscountValue || 0),
+    mealAllowanceDiscountPercent: Number(entry.mealAllowanceDiscountPercent || 0),
+    mealAllowanceCardDiscountValue: Number(entry.mealAllowanceCardDiscountValue || 0),
+    netCashValue: Number(entry.netCashValue || 0),
     linkedTaxRecordId: String(entry.linkedTaxRecordId || "").trim(),
     linkedContractPaymentId: String(entry.linkedContractPaymentId || "").trim(),
     linkedRentedPropertyPaymentId: String(entry.linkedRentedPropertyPaymentId || "").trim(),
   })).filter((entry) => entry.description && entry.amount >= 0 && entry.dateTime);
+
+  // Mantém histórico salarial coerente com os lançamentos existentes no balanço.
+  const salaryHistoryIdsInBalance = new Set(
+    (state.balance.entries || [])
+      .filter((entry) => entry.type === "expense" && resolveExpenseCategory(entry) === "salario")
+      .map((entry) => String(entry.salaryHistoryId || "").trim())
+      .filter(Boolean),
+  );
+  const salaryReferenceCountByEmployee = new Map();
+  (state.balance.entries || [])
+    .filter((entry) => entry.type === "expense" && resolveExpenseCategory(entry) === "salario")
+    .forEach((entry) => {
+      const key = `${String(entry.employeeId || "").trim()}|${Number(entry.referenceYear || 0)}|${Number(entry.referenceMonth || 0)}`;
+      if (!key.includes("|0|")) {
+        salaryReferenceCountByEmployee.set(key, (salaryReferenceCountByEmployee.get(key) || 0) + 1);
+      }
+    });
+  state.payslipEmployees = (state.payslipEmployees || []).map((employee) => {
+    const history = Array.isArray(employee.salaryHistory) ? [...employee.salaryHistory] : [];
+    const filteredHistory = history.filter((item) => {
+      const historyId = String(item.id || "").trim();
+      if (historyId && salaryHistoryIdsInBalance.has(historyId)) return true;
+      const key = `${String(employee.id || "").trim()}|${Number(item.referenceYear || 0)}|${Number(item.referenceMonth || 0)}`;
+      const count = salaryReferenceCountByEmployee.get(key) || 0;
+      if (count > 0) {
+        salaryReferenceCountByEmployee.set(key, count - 1);
+        return true;
+      }
+      return false;
+    });
+    return {
+      ...employee,
+      salaryHistory: filteredHistory,
+    };
+  });
 
   state.taxes.records = (state.taxes.records || [])
     .map((record) => ({
@@ -8570,6 +8620,13 @@ function bindEvents() {
         category: "salario",
         employeeId,
         salaryHistoryId,
+        inssDiscountValue: settlement.inssDiscountValue,
+        fgtsBaseSalary: settlement.fgtsBaseSalary,
+        confederativeDiscountPercent: settlement.confederativeDiscountPercent,
+        confederativeDiscountValue: settlement.confederativeDiscountValue,
+        mealAllowanceDiscountPercent: settlement.mealAllowanceCardDiscountPercent,
+        mealAllowanceCardDiscountValue: settlement.mealAllowanceCardDiscountValue,
+        netCashValue: settlement.netCashValue,
         linkedContractPaymentId: "",
         linkedRentedPropertyPaymentId: "",
       };
