@@ -685,9 +685,9 @@ input:focus, select:focus, textarea:focus {
 }
 
 .proposal-doc.proposal-doc-pdf {
-  width: 188mm;
-  max-width: 188mm;
-  margin: 0 auto;
+  width: 190mm;
+  max-width: 190mm;
+  margin: 0 !important;
   border: 0;
   border-radius: 0;
   box-shadow: none;

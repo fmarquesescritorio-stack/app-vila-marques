@@ -3447,12 +3447,6 @@ async function exportProposalAsPdfFile(proposalDocNode) {
   const filename = `Proposta Comercial - ${companyName} - ${monthYear} - A C ${contactName}.pdf`;
 
   try {
-    const captureRect = isolatedDoc.getBoundingClientRect();
-    const captureWidth = Math.max(900, Math.ceil(captureRect.width || isolatedDoc.scrollWidth || 900));
-    const captureHeight = Math.max(1200, Math.ceil(captureRect.height || isolatedDoc.scrollHeight || 1200));
-    const captureX = Math.max(0, Math.floor(captureRect.left));
-    const captureY = Math.max(0, Math.floor(captureRect.top));
-
     await window.html2pdf()
       .set({
         margin: [10, 10, 10, 10],
@@ -3462,12 +3456,7 @@ async function exportProposalAsPdfFile(proposalDocNode) {
           scale: 2,
           useCORS: true,
           backgroundColor: "#ffffff",
-          width: captureWidth,
-          height: captureHeight,
-          x: captureX,
-          y: captureY,
-          windowWidth: Math.max(1200, captureWidth),
-          windowHeight: Math.max(1600, captureHeight),
+          letterRendering: true,
           scrollX: 0,
           scrollY: 0,
         },
