@@ -110,6 +110,13 @@ const state = {
   contractsPortfolio: [],
   activeContractId: "",
   rentedProperties: [],
+  measurement: {
+    measurementNumber: "01",
+    clientName: "",
+    periodStart: "",
+    periodEnd: "",
+    items: [],
+  },
   exports: [],
   deletedExportIds: [],
 };
@@ -276,6 +283,7 @@ const APP_TABS = [
   "balance",
   "taxes",
   "contracts",
+  "measurement",
   "rentedProperties",
   "exports",
 ];
@@ -288,6 +296,7 @@ const TAB_TO_SLUG = {
   balance: "balanco",
   taxes: "impostos",
   contracts: "contratos",
+  measurement: "medicao",
   rentedProperties: "imoveis-alugados",
   exports: "exportados",
 };
@@ -878,6 +887,11 @@ function applyStateSnapshot(data) {
   state.contractsPortfolio = Array.isArray(data.contractsPortfolio) ? data.contractsPortfolio : [];
   state.activeContractId = String(data.activeContractId || "").trim();
   state.rentedProperties = Array.isArray(data.rentedProperties) ? data.rentedProperties : [];
+  state.measurement = {
+    ...state.measurement,
+    ...(data.measurement || {}),
+    items: Array.isArray(data.measurement?.items) ? data.measurement.items : [],
+  };
   state.exports = Array.isArray(data.exports) ? data.exports : [];
   state.deletedExportIds = Array.isArray(data.deletedExportIds) ? data.deletedExportIds : [];
   normalizeStatePatterns();
@@ -901,6 +915,7 @@ function getStateSnapshot() {
     contractsPortfolio: cloneSnapshot(state.contractsPortfolio || []),
     activeContractId: String(state.activeContractId || "").trim(),
     rentedProperties: cloneSnapshot(state.rentedProperties || []),
+    measurement: cloneSnapshot(state.measurement || {}),
     exports: cloneSnapshot(state.exports || []),
     deletedExportIds: cloneSnapshot(state.deletedExportIds || []),
     savedAt: new Date().toISOString(),
@@ -1196,6 +1211,28 @@ function normalizeStatePatterns() {
       || item.contractStartDateISO
       || item.contractEndDateISO
     ));
+
+  state.measurement = {
+    ...state.measurement,
+    measurementNumber: String(state.measurement?.measurementNumber || "01").trim() || "01",
+    clientName: String(state.measurement?.clientName || "").trim(),
+    periodStart: String(state.measurement?.periodStart || "").trim(),
+    periodEnd: String(state.measurement?.periodEnd || "").trim(),
+    items: (state.measurement?.items || [])
+      .map((item, index) => ({
+        id: String(item.id || `${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`),
+        address: String(item.address || "").trim(),
+        collaboratorLevel: String(item.collaboratorLevel || "").trim(),
+        vacancies: Number(item.vacancies || 0),
+        occupation: Number(item.occupation || 0),
+        periodStart: String(item.periodStart || "").trim(),
+        periodEnd: String(item.periodEnd || "").trim(),
+        days: Number(item.days || 0),
+        dailyQty: Number(item.dailyQty || 0),
+        dailyValue: Number(item.dailyValue || 0),
+      }))
+      .filter((item) => item.address),
+  };
   const rentedPropertyIds = new Set(state.rentedProperties.map((item) => item.id));
   state.contractsPortfolio = state.contractsPortfolio.map((contract) => ({
     ...contract,
@@ -1776,6 +1813,7 @@ function canAccessTab(tabName) {
     balance: "accessBalance",
     taxes: "accessBalance",
     contracts: "accessContracts",
+    measurement: "accessContracts",
     rentedProperties: "accessContracts",
     exports: "accessExports",
   };
@@ -1829,6 +1867,7 @@ function applyPermissionsUi() {
     ["tabBalance", "accessBalance"],
     ["tabTaxes", "accessBalance"],
     ["tabContracts", "accessContracts"],
+    ["tabMeasurement", "accessContracts"],
     ["tabRentedProperties", "accessContracts"],
     ["tabExports", "accessExports"],
   ];
@@ -2373,6 +2412,17 @@ function resetActiveTabInputs() {
   if (uiState.activeTab === "rentedProperties") {
     uiState.rentedPropertiesFormOpen = false;
     uiState.editingRentedPropertyId = "";
+    return;
+  }
+
+  if (uiState.activeTab === "measurement") {
+    state.measurement = {
+      measurementNumber: "01",
+      clientName: "",
+      periodStart: "",
+      periodEnd: "",
+      items: [],
+    };
   }
 }
 
@@ -2435,6 +2485,11 @@ function resetModuleUiState(moduleName) {
 
   if (moduleName === "taxes") {
     uiState.editingTaxRecordId = "";
+    return;
+  }
+
+  if (moduleName === "measurement") {
+    // Módulo sem estado visual colapsável no momento.
   }
 }
 
@@ -2464,6 +2519,7 @@ function setActiveTab(tabName, options = {}) {
   const balanceModule = document.getElementById("balanceModule");
   const taxesModule = document.getElementById("taxesModule");
   const contractsModule = document.getElementById("contractsModule");
+  const measurementModule = document.getElementById("measurementModule");
   const rentedPropertiesModule = document.getElementById("rentedPropertiesModule");
   const exportsModule = document.getElementById("exportsModule");
   const tabHome = document.getElementById("tabHome");
@@ -2474,6 +2530,7 @@ function setActiveTab(tabName, options = {}) {
   const tabBalance = document.getElementById("tabBalance");
   const tabTaxes = document.getElementById("tabTaxes");
   const tabContracts = document.getElementById("tabContracts");
+  const tabMeasurement = document.getElementById("tabMeasurement");
   const tabRentedProperties = document.getElementById("tabRentedProperties");
   const tabExports = document.getElementById("tabExports");
   const btnExportProposal = document.getElementById("btnExportPdf");
@@ -2487,6 +2544,7 @@ function setActiveTab(tabName, options = {}) {
   balanceModule.classList.toggle("module-active", uiState.activeTab === "balance");
   taxesModule.classList.toggle("module-active", uiState.activeTab === "taxes");
   contractsModule.classList.toggle("module-active", uiState.activeTab === "contracts");
+  measurementModule.classList.toggle("module-active", uiState.activeTab === "measurement");
   rentedPropertiesModule.classList.toggle("module-active", uiState.activeTab === "rentedProperties");
   exportsModule.classList.toggle("module-active", uiState.activeTab === "exports");
   tabHome.classList.toggle("tab-btn-active", uiState.activeTab === "home");
@@ -2497,6 +2555,7 @@ function setActiveTab(tabName, options = {}) {
   tabBalance.classList.toggle("tab-btn-active", uiState.activeTab === "balance");
   tabTaxes.classList.toggle("tab-btn-active", uiState.activeTab === "taxes");
   tabContracts.classList.toggle("tab-btn-active", uiState.activeTab === "contracts");
+  tabMeasurement.classList.toggle("tab-btn-active", uiState.activeTab === "measurement");
   tabRentedProperties.classList.toggle("tab-btn-active", uiState.activeTab === "rentedProperties");
   tabExports.classList.toggle("tab-btn-active", uiState.activeTab === "exports");
 
@@ -2842,6 +2901,153 @@ function buildFullAddress(property) {
 
 function hasValue(value) {
   return String(value || "").trim().length > 0;
+}
+
+function getMeasurementTotals(items) {
+  return items.reduce((acc, item) => {
+    acc.vacancies += Number(item.vacancies || 0);
+    acc.occupation += Number(item.occupation || 0);
+    acc.dailyQty += Number(item.dailyQty || 0);
+    acc.total += Number(item.total || 0);
+    return acc;
+  }, {
+    vacancies: 0,
+    occupation: 0,
+    dailyQty: 0,
+    total: 0,
+  });
+}
+
+function normalizeMeasurementItem(item, index = 0) {
+  const vacancies = Math.max(0, Number(item?.vacancies || 0));
+  const occupation = Math.max(0, Number(item?.occupation || 0));
+  const days = Math.max(0, Number(item?.days || 0));
+  const dailyQtyRaw = Math.max(0, Number(item?.dailyQty || 0));
+  const dailyQty = dailyQtyRaw > 0 ? dailyQtyRaw : (vacancies * days);
+  const dailyValue = Math.max(0, Number(item?.dailyValue || 0));
+  const total = dailyQty * dailyValue;
+  return {
+    id: String(item?.id || `${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`),
+    itemCode: String(index + 1).padStart(2, "0"),
+    address: String(item?.address || "").trim(),
+    collaboratorLevel: String(item?.collaboratorLevel || "").trim(),
+    vacancies,
+    occupation,
+    periodStart: String(item?.periodStart || "").trim(),
+    periodEnd: String(item?.periodEnd || "").trim(),
+    days,
+    dailyQty,
+    dailyValue,
+    total,
+  };
+}
+
+function calculateInclusiveDaysBetween(startISO, endISO) {
+  const start = parseISODateOnly(startISO);
+  const end = parseISODateOnly(endISO);
+  if (!start || !end) return 0;
+  const diff = Math.floor((end.getTime() - start.getTime()) / 86400000);
+  return diff >= 0 ? diff + 1 : 0;
+}
+
+function renderMeasurement() {
+  const output = document.getElementById("measurementOutput");
+  if (!output) return;
+
+  const measurementData = state.measurement || {};
+  const items = (measurementData.items || [])
+    .map((item, index) => normalizeMeasurementItem(item, index))
+    .filter((item) => item.address);
+  const totals = getMeasurementTotals(items);
+  const periodLabel = `${formatDateBR(measurementData.periodStart)} a ${formatDateBR(measurementData.periodEnd)}`;
+
+  const rowsHtml = items.length
+    ? items
+      .map((item) => `
+        <tr>
+          <td class="num">${escapeHtml(item.itemCode)}</td>
+          <td class="address">${escapeHtml(item.address)}</td>
+          <td class="num">${escapeHtml(item.collaboratorLevel || "-")}</td>
+          <td class="num">${escapeHtml(String(item.vacancies || 0))}</td>
+          <td class="num">${escapeHtml(String(item.occupation || 0))}</td>
+          <td class="num">${formatDateBR(item.periodStart)}</td>
+          <td class="num">${formatDateBR(item.periodEnd)}</td>
+          <td class="num">${escapeHtml(String(item.days || 0))}</td>
+          <td class="num">${escapeHtml(String(item.dailyQty || 0))}</td>
+          <td class="money">${currencyBRL.format(Number(item.dailyValue || 0))}</td>
+          <td class="money">${currencyBRL.format(Number(item.total || 0))}</td>
+          <td class="measurement-hide-pdf num">
+            <button type="button" class="btn btn-danger btn-remove-measurement-item" data-measurement-item-id="${escapeHtml(item.id)}">Remover</button>
+          </td>
+        </tr>
+      `)
+      .join("")
+    : `
+      <tr>
+        <td colspan="12" class="num">Nenhum item lançado.</td>
+      </tr>
+    `;
+
+  output.innerHTML = `
+    <article id="measurementSheet" class="measurement-sheet">
+      <div class="measurement-company-header">
+        <img src="${FIXED_LOGO_PATH}" alt="Logo Vila Marques Alojamentos" />
+        <div class="measurement-company-info">
+          <strong>${escapeHtml(CONTRACTOR_INFO.companyName)}</strong><br />
+          CNPJ: ${escapeHtml(CONTRACTOR_INFO.cnpj)}<br />
+          Responsável: ${escapeHtml(CONTRACTOR_INFO.responsible)}<br />
+          Telefone: ${escapeHtml(CONTRACTOR_INFO.phone)}
+        </div>
+      </div>
+
+      <div class="measurement-title-row">
+        <div>MEDIÇÃO Nº: ${escapeHtml(measurementData.measurementNumber || "01")} - ${escapeHtml(measurementData.clientName || "CLIENTE NÃO INFORMADO")}</div>
+        <div>PERÍODO: ${escapeHtml(periodLabel)}</div>
+      </div>
+
+      <table class="measurement-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Endereços</th>
+            <th>Nível de colaborador</th>
+            <th>Quant. de vagas</th>
+            <th>Ocupação</th>
+            <th>Início</th>
+            <th>Fim</th>
+            <th>Quant. de dias</th>
+            <th>Quant. de diárias</th>
+            <th>Valor vaga dia</th>
+            <th>Valor total</th>
+            <th class="measurement-hide-pdf">Ações</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+        <tfoot>
+          <tr>
+            <td class="num" colspan="3"><strong>TOTAL</strong></td>
+            <td class="num"><strong>${escapeHtml(String(totals.vacancies))}</strong></td>
+            <td class="num"><strong>${escapeHtml(String(totals.occupation))}</strong></td>
+            <td colspan="3"></td>
+            <td class="num"><strong>${escapeHtml(String(totals.dailyQty))}</strong></td>
+            <td class="num"><strong>TOTAL GERAL</strong></td>
+            <td class="money"><strong>${currencyBRL.format(totals.total)}</strong></td>
+            <td class="measurement-hide-pdf"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </article>
+  `;
+
+  output.querySelectorAll(".btn-remove-measurement-item").forEach((button) => {
+    button.addEventListener("click", () => {
+      const itemId = String(button.getAttribute("data-measurement-item-id") || "");
+      if (!itemId) return;
+      state.measurement.items = (state.measurement.items || []).filter((item) => String(item.id || "") !== itemId);
+      saveState();
+      renderMeasurement();
+    });
+  });
 }
 
 function renderProposal() {
@@ -3552,6 +3758,62 @@ async function exportPayslipAsPdfFile(payslipSheetNode) {
     return false;
   } finally {
     payslipSheetNode.classList.remove("payslip-sheet-pdf");
+  }
+}
+
+async function exportMeasurementAsPdfFile(measurementSheetNode) {
+  if (!measurementSheetNode) return false;
+  const hasLib = await ensureHtml2PdfBundle();
+  if (!hasLib || !window.html2pdf) return false;
+  const isolatedWrapper = document.createElement("div");
+  isolatedWrapper.style.position = "fixed";
+  isolatedWrapper.style.left = "0";
+  isolatedWrapper.style.top = "0";
+  isolatedWrapper.style.width = "210mm";
+  isolatedWrapper.style.padding = "0";
+  isolatedWrapper.style.margin = "0";
+  isolatedWrapper.style.background = "#fff";
+  isolatedWrapper.style.opacity = "0";
+  isolatedWrapper.style.pointerEvents = "none";
+  isolatedWrapper.style.zIndex = "-1";
+  isolatedWrapper.style.overflow = "hidden";
+
+  const isolatedSheet = measurementSheetNode.cloneNode(true);
+  isolatedSheet.classList.add("measurement-sheet-pdf");
+  isolatedWrapper.appendChild(isolatedSheet);
+  document.body.appendChild(isolatedWrapper);
+
+  await waitForProposalRenderReady(isolatedSheet);
+
+  const clientName = sanitizeFilenamePart(state.measurement?.clientName || "Sem cliente", "Sem cliente");
+  const periodEnd = String(state.measurement?.periodEnd || "").trim();
+  const dateLabel = formatDateForFileName(periodEnd);
+  const filename = `Medicao - ${clientName} - ${dateLabel}.pdf`;
+
+  try {
+    await window.html2pdf()
+      .set({
+        margin: [8, 8, 8, 8],
+        filename,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          letterRendering: true,
+          scrollX: 0,
+          scrollY: 0,
+        },
+        jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+        pagebreak: { mode: ["css", "legacy"] },
+      })
+      .from(isolatedSheet)
+      .save();
+    return true;
+  } catch (_error) {
+    return false;
+  } finally {
+    isolatedWrapper.remove();
   }
 }
 
@@ -7095,6 +7357,7 @@ function renderAll() {
   setFormValues(document.getElementById("payslipForm"), state.payslip);
   applyPayslipFormDefaults();
   setFormValues(document.getElementById("contractsForm"), state.contracts);
+  setFormValues(document.getElementById("measurementForm"), state.measurement);
   refreshBrazilianPatternInputs();
   setupBRLInputs(document.getElementById("clientCatalogForm"));
   setupBRLInputs(document.getElementById("employeeCatalogForm"));
@@ -7106,6 +7369,7 @@ function renderAll() {
   setupBRLInputs(document.getElementById("expenseForm"));
   setupBRLInputs(document.getElementById("salaryPaymentForm"));
   setupBRLInputs(document.getElementById("rentedPropertyForm"));
+  setupBRLInputs(document.getElementById("measurementItemForm"));
   renderPendingEmployeeDocuments();
   renderProposalPhotosList();
   renderHomeDashboard();
@@ -7149,6 +7413,7 @@ function renderAll() {
   renderTaxes();
   renderContracts();
   renderRentedPropertiesModule();
+  renderMeasurement();
   renderExports();
   renderNotifications();
 }
@@ -7169,6 +7434,7 @@ function renderHomeDashboard() {
     { tab: "balance", title: "Balanço", description: "Lançar entradas/saídas e acompanhar resultados." },
     { tab: "taxes", title: "Impostos", description: "Registrar faturamento, impostos e alíquota." },
     { tab: "contracts", title: "Contratos", description: "Gerenciar contratos e recebimentos." },
+    { tab: "measurement", title: "Medição", description: "Montar planilhas de medição e exportar PDF." },
     { tab: "rentedProperties", title: "Imóveis Alugados", description: "Controlar alugueis e vencimentos." },
     { tab: "exports", title: "Exportados", description: "Acessar documentos exportados." },
   ].filter((item) => canAccessTab(item.tab));
@@ -7540,6 +7806,11 @@ function bindEvents() {
   document.getElementById("tabContracts").addEventListener("click", () => {
     setActiveTab("contracts");
     renderContracts();
+  });
+
+  document.getElementById("tabMeasurement").addEventListener("click", () => {
+    setActiveTab("measurement");
+    renderMeasurement();
   });
 
   document.getElementById("tabRentedProperties").addEventListener("click", () => {
@@ -7987,6 +8258,91 @@ function bindEvents() {
     saveState();
     renderProposal();
   });
+
+  const measurementForm = document.getElementById("measurementForm");
+  if (measurementForm) {
+    const persistMeasurementHeader = () => {
+      const data = formToObject(measurementForm);
+      state.measurement = {
+        ...state.measurement,
+        measurementNumber: String(data.measurementNumber || "01").trim() || "01",
+        clientName: String(data.clientName || "").trim(),
+        periodStart: String(data.periodStart || "").trim(),
+        periodEnd: String(data.periodEnd || "").trim(),
+      };
+      saveState();
+      renderMeasurement();
+    };
+    measurementForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      persistMeasurementHeader();
+    });
+    measurementForm.addEventListener("input", () => {
+      persistMeasurementHeader();
+    });
+    measurementForm.addEventListener("change", () => {
+      persistMeasurementHeader();
+    });
+  }
+
+  const measurementItemForm = document.getElementById("measurementItemForm");
+  if (measurementItemForm) {
+    setupBRLInputs(measurementItemForm);
+    measurementItemForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = formToObject(measurementItemForm);
+      const address = String(data.address || "").trim();
+      if (!address) {
+        alert("Preencha o endereço do item da medição.");
+        return;
+      }
+      const periodStart = String(data.periodStart || state.measurement?.periodStart || "").trim();
+      const periodEnd = String(data.periodEnd || state.measurement?.periodEnd || "").trim();
+      const daysInput = Number(data.days || 0);
+      const autoDays = calculateInclusiveDaysBetween(periodStart, periodEnd);
+      const days = daysInput > 0 ? daysInput : autoDays;
+      const vacancies = Math.max(0, Number(data.vacancies || 0));
+      const dailyQtyInput = Math.max(0, Number(data.dailyQty || 0));
+      const dailyQty = dailyQtyInput > 0 ? dailyQtyInput : (vacancies * Math.max(0, days));
+      const nextItem = {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        address,
+        collaboratorLevel: String(data.collaboratorLevel || "").trim(),
+        vacancies,
+        occupation: Math.max(0, Number(data.occupation || 0)),
+        periodStart,
+        periodEnd,
+        days: Math.max(0, Number(days || 0)),
+        dailyQty,
+        dailyValue: parseBRLNumber(data.dailyValue || 0),
+      };
+      state.measurement = {
+        ...state.measurement,
+        items: [...(state.measurement.items || []), nextItem],
+      };
+      saveState();
+      measurementItemForm.reset();
+      const defaultStart = state.measurement.periodStart || "";
+      const defaultEnd = state.measurement.periodEnd || "";
+      if (measurementItemForm.elements.namedItem("periodStart")) {
+        measurementItemForm.elements.namedItem("periodStart").value = defaultStart;
+      }
+      if (measurementItemForm.elements.namedItem("periodEnd")) {
+        measurementItemForm.elements.namedItem("periodEnd").value = defaultEnd;
+      }
+      if (measurementItemForm.elements.namedItem("days")) {
+        measurementItemForm.elements.namedItem("days").value = "30";
+      }
+      if (measurementItemForm.elements.namedItem("dailyQty")) {
+        measurementItemForm.elements.namedItem("dailyQty").value = "0";
+      }
+      if (measurementItemForm.elements.namedItem("dailyValue")) {
+        measurementItemForm.elements.namedItem("dailyValue").value = "R$ 0,00";
+      }
+      setupBRLInputs(measurementItemForm);
+      renderMeasurement();
+    });
+  }
 
   const payslipForm = document.getElementById("payslipForm");
   setupBRLInputs(payslipForm);
@@ -9365,6 +9721,43 @@ function bindEvents() {
     if (exportBtn) {
       exportBtn.disabled = false;
       exportBtn.textContent = "Exportar contracheque A4";
+    }
+  });
+
+  document.getElementById("btnExportMeasurementPdf")?.addEventListener("click", async () => {
+    if (!hasPermission("exportProposal")) {
+      alert("Sem permissão para exportar medição.");
+      return;
+    }
+    const hasItems = Array.isArray(state.measurement?.items) && state.measurement.items.length > 0;
+    if (!hasItems) {
+      alert("Adicione ao menos um item na planilha antes de exportar.");
+      return;
+    }
+    const exportBtn = document.getElementById("btnExportMeasurementPdf");
+    if (exportBtn) {
+      exportBtn.disabled = true;
+      exportBtn.textContent = "Gerando PDF...";
+    }
+    setActiveTab("measurement");
+    renderMeasurement();
+    const measurementSheet = document.getElementById("measurementSheet");
+    if (!measurementSheet) {
+      alert("Não foi possível gerar a medição para exportação.");
+      if (exportBtn) {
+        exportBtn.disabled = false;
+        exportBtn.textContent = "Exportar medição em PDF";
+      }
+      return;
+    }
+    await waitForProposalRenderReady(measurementSheet);
+    const downloaded = await exportMeasurementAsPdfFile(measurementSheet);
+    if (!downloaded) {
+      alert("Não foi possível exportar a medição em PDF.");
+    }
+    if (exportBtn) {
+      exportBtn.disabled = false;
+      exportBtn.textContent = "Exportar medição em PDF";
     }
   });
 

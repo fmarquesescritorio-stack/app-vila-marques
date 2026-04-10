@@ -79,6 +79,7 @@
             <button id="tabBalance" class="tab-btn" type="button" data-tab="balance">Balanço</button>
             <button id="tabTaxes" class="tab-btn" type="button" data-tab="taxes">Impostos</button>
             <button id="tabContracts" class="tab-btn" type="button" data-tab="contracts">Contratos</button>
+            <button id="tabMeasurement" class="tab-btn" type="button" data-tab="measurement">Medição</button>
             <button id="tabRentedProperties" class="tab-btn" type="button" data-tab="rentedProperties">Imóveis Alugados</button>
             <button id="tabExports" class="tab-btn" type="button" data-tab="exports">Exportados</button>
           </div>
@@ -805,6 +806,67 @@
             <div id="rentedPropertiesSavedList"></div>
             <div id="rentedPropertiesPaymentStatement" style="margin-top: 12px;"></div>
           </div>
+        </section>
+      </section>
+
+      <section id="measurementModule" class="module">
+        <section class="panel">
+          <h2>Planilha de Medição</h2>
+          <form id="measurementForm" class="form-grid">
+            <label>Nº da medição
+              <input name="measurementNumber" placeholder="Ex.: 01" />
+            </label>
+            <label>Empresa (cliente)
+              <input name="clientName" placeholder="Ex.: FIDENS CONSTRUÇÕES S/A" />
+            </label>
+            <label>Período início
+              <input name="periodStart" type="date" />
+            </label>
+            <label>Período fim
+              <input name="periodEnd" type="date" />
+            </label>
+            <div class="full row-end">
+              <button class="btn" type="submit">Salvar cabeçalho</button>
+              <button id="btnExportMeasurementPdf" class="btn btn-primary" type="button">Exportar medição em PDF</button>
+            </div>
+          </form>
+
+          <hr />
+
+          <form id="measurementItemForm" class="form-grid">
+            <label>Endereço
+              <input name="address" placeholder="Rua, número, bairro, cidade/UF" required />
+            </label>
+            <label>Nível de colaborador
+              <input name="collaboratorLevel" placeholder="Ex.: MOI" required />
+            </label>
+            <label>Quant. de vagas
+              <input name="vacancies" type="number" min="0" value="0" required />
+            </label>
+            <label>Ocupação
+              <input name="occupation" type="number" min="0" value="0" required />
+            </label>
+            <label>Início
+              <input name="periodStart" type="date" required />
+            </label>
+            <label>Fim
+              <input name="periodEnd" type="date" required />
+            </label>
+            <label>Quant. de dias
+              <input name="days" type="number" min="0" value="30" required />
+            </label>
+            <label>Quant. de diárias
+              <input name="dailyQty" type="number" min="0" value="0" required />
+            </label>
+            <label>Valor vaga/dia (R$)
+              <input name="dailyValue" data-brl inputmode="numeric" value="R$ 0,00" required />
+            </label>
+            <div class="full row-end">
+              <button class="btn" type="submit">Adicionar item</button>
+            </div>
+          </form>
+
+          <div id="measurementOutput" class="measurement-output"></div>
         </section>
       </section>
     </main>

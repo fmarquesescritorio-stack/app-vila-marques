@@ -1364,6 +1364,109 @@ input:focus, select:focus, textarea:focus {
   background: #f8fafc;
 }
 
+.measurement-output {
+  margin-top: 12px;
+}
+
+.measurement-sheet {
+  background: #fff;
+  border: 1px solid #1f2937;
+  overflow: auto;
+}
+
+.measurement-sheet.measurement-sheet-pdf {
+  width: 190mm;
+  max-width: 190mm;
+  margin: 0;
+  border: 1px solid #000;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.measurement-company-header {
+  min-height: 96px;
+  border-bottom: 2px solid #111827;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+}
+
+.measurement-company-header img {
+  width: 120px;
+  height: auto;
+}
+
+.measurement-company-info {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.measurement-title-row {
+  background: #ebd7c7;
+  border-top: 2px solid #111827;
+  border-bottom: 2px solid #111827;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+}
+
+.measurement-title-row > div {
+  padding: 8px 10px;
+  border-right: 2px solid #111827;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.measurement-title-row > div:last-child {
+  border-right: 0;
+}
+
+.measurement-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.measurement-table th,
+.measurement-table td {
+  border: 1px solid #111827;
+  padding: 5px 6px;
+  font-size: 11px;
+  vertical-align: middle;
+}
+
+.measurement-table th {
+  background: #f3f4f6;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.measurement-table tfoot td {
+  background: #f9fafb;
+  font-weight: 800;
+}
+
+.measurement-table .num {
+  text-align: center;
+}
+
+.measurement-table .money {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.measurement-table .address {
+  word-break: break-word;
+}
+
+.measurement-hide-pdf {
+  width: 92px;
+}
+
+.measurement-sheet.measurement-sheet-pdf .measurement-hide-pdf {
+  display: none !important;
+}
+
 .yearly-overview {
   border: 1px solid #dbe3ed;
   border-radius: 10px;
@@ -1671,6 +1774,7 @@ body.balance-values-blurred #balanceModule .month-profit {
   #employeesModule .exports-actions .btn,
   #clientsModule .exports-actions .btn,
   #contractsModule .exports-actions .btn,
+  #measurementModule .exports-actions .btn,
   #taxesModule .exports-actions .btn,
   #rentedPropertiesModule .exports-actions .btn,
   #exportsModule .exports-actions .btn,
@@ -1681,6 +1785,9 @@ body.balance-values-blurred #balanceModule .month-profit {
     flex: 1 1 100%;
     padding: 8px 7px;
     font-size: 12px;
+  }
+  .measurement-table {
+    min-width: 980px;
   }
 }
 
