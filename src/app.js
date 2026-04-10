@@ -25,6 +25,7 @@ const CONTRACTOR_INFO = {
   cnpj: "58.924.922/0001-75",
   responsible: "Fred Marques",
   phone: "(31) 99578-5160",
+  email: "fmarquesescritorio@gmail.com",
 };
 const DEFAULT_FURNITURE = [
   { item: "Geladeira", environment: "Cozinha" },
@@ -2955,6 +2956,9 @@ async function exportMeasurementAsExcelFile() {
   const dateLabel = formatDateForFileName(measurement.periodEnd || "");
 
   const workbook = new window.ExcelJS.Workbook();
+  workbook.creator = CONTRACTOR_INFO.companyName;
+  workbook.created = new Date();
+  workbook.calcProperties = { fullCalcOnLoad: true };
   const sheet = workbook.addWorksheet("Medição", {
     views: [{ state: "frozen", ySplit: 4 }],
     pageSetup: {
@@ -2969,23 +2973,25 @@ async function exportMeasurementAsExcelFile() {
 
   sheet.columns = [
     { key: "A", width: 7 },
-    { key: "B", width: 41 },
-    { key: "C", width: 15 },
+    { key: "B", width: 54 },
+    { key: "C", width: 22 },
     { key: "D", width: 11 },
-    { key: "E", width: 10 },
-    { key: "F", width: 12 },
-    { key: "G", width: 12 },
+    { key: "E", width: 15 },
+    { key: "F", width: 12.5 },
+    { key: "G", width: 12.5 },
     { key: "H", width: 11 },
-    { key: "I", width: 11 },
-    { key: "J", width: 12 },
-    { key: "K", width: 14 },
+    { key: "I", width: 14 },
+    { key: "J", width: 14 },
+    { key: "K", width: 15 },
   ];
 
   sheet.mergeCells("A1:B2");
   sheet.mergeCells("C1:K2");
-  sheet.getCell("C1").value = `${CONTRACTOR_INFO.companyName}\nCNPJ: ${CONTRACTOR_INFO.cnpj}\nResponsável: ${CONTRACTOR_INFO.responsible}\nTelefone: ${CONTRACTOR_INFO.phone}`;
+  sheet.getCell("C1").value = `${CONTRACTOR_INFO.companyName}\nCNPJ: ${CONTRACTOR_INFO.cnpj}\nResponsável: ${CONTRACTOR_INFO.responsible}\nTelefone: ${CONTRACTOR_INFO.phone}${CONTRACTOR_INFO.email ? ` | E-mail: ${CONTRACTOR_INFO.email}` : ""}`;
   sheet.getCell("C1").alignment = { vertical: "middle", horizontal: "left", wrapText: true };
-  sheet.getCell("C1").font = { name: "Calibri", size: 13, bold: true };
+  sheet.getCell("C1").font = { name: "Calibri", size: 12, bold: true };
+  sheet.getRow(1).height = 44;
+  sheet.getRow(2).height = 44;
 
   sheet.mergeCells("A3:G3");
   sheet.mergeCells("H3:K3");
@@ -2997,6 +3003,7 @@ async function exportMeasurementAsExcelFile() {
     cell.font = { name: "Calibri", size: 12, bold: true };
     cell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
   });
+  sheet.getRow(3).height = 28;
 
   const headerRowIndex = 4;
   const headers = [
@@ -3019,40 +3026,44 @@ async function exportMeasurementAsExcelFile() {
     cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
   });
-  sheet.getRow(headerRowIndex).height = 40;
+  sheet.getRow(headerRowIndex).height = 64;
 
   const firstDataRow = headerRowIndex + 1;
   items.forEach((item, index) => {
     const rowIndex = firstDataRow + index;
+    const startDate = parseISODateOnly(item.periodStart);
+    const endDate = parseISODateOnly(item.periodEnd);
     sheet.getCell(rowIndex, 1).value = item.itemCode;
     sheet.getCell(rowIndex, 2).value = item.address;
     sheet.getCell(rowIndex, 3).value = item.collaboratorLevel || "-";
     sheet.getCell(rowIndex, 4).value = Number(item.vacancies || 0);
     sheet.getCell(rowIndex, 5).value = Number(item.occupation || 0);
-    sheet.getCell(rowIndex, 6).value = formatDateBR(item.periodStart);
-    sheet.getCell(rowIndex, 7).value = formatDateBR(item.periodEnd);
+    sheet.getCell(rowIndex, 6).value = startDate || formatDateBR(item.periodStart);
+    sheet.getCell(rowIndex, 7).value = endDate || formatDateBR(item.periodEnd);
     sheet.getCell(rowIndex, 8).value = Number(item.days || 0);
-    sheet.getCell(rowIndex, 9).value = Number(item.dailyQty || 0);
+    sheet.getCell(rowIndex, 9).value = { formula: `D${rowIndex}*H${rowIndex}`, result: Number(item.dailyQty || 0) };
     sheet.getCell(rowIndex, 10).value = Number(item.dailyValue || 0);
-    sheet.getCell(rowIndex, 11).value = { formula: `I${rowIndex}*J${rowIndex}` };
+    sheet.getCell(rowIndex, 11).value = { formula: `I${rowIndex}*J${rowIndex}`, result: Number(item.total || 0) };
     sheet.getCell(rowIndex, 2).alignment = { vertical: "top", horizontal: "left", wrapText: true };
+    sheet.getCell(rowIndex, 6).numFmt = "dd/mm/yyyy";
+    sheet.getCell(rowIndex, 7).numFmt = "dd/mm/yyyy";
     sheet.getCell(rowIndex, 10).numFmt = '"R$" #,##0.00';
     sheet.getCell(rowIndex, 11).numFmt = '"R$" #,##0.00';
     for (let col = 1; col <= 11; col += 1) {
       if (col !== 2) sheet.getCell(rowIndex, col).alignment = { vertical: "middle", horizontal: "center", wrapText: true };
     }
-    sheet.getRow(rowIndex).height = 54;
+    sheet.getRow(rowIndex).height = 46;
   });
 
   const totalRow = firstDataRow + items.length;
   sheet.mergeCells(`A${totalRow}:C${totalRow}`);
   sheet.getCell(`A${totalRow}`).value = "TOTAL";
-  sheet.getCell(`D${totalRow}`).value = { formula: `SUM(D${firstDataRow}:D${totalRow - 1})` };
-  sheet.getCell(`E${totalRow}`).value = { formula: `SUM(E${firstDataRow}:E${totalRow - 1})` };
+  sheet.getCell(`D${totalRow}`).value = { formula: `SUM(D${firstDataRow}:D${totalRow - 1})`, result: totals.vacancies };
+  sheet.getCell(`E${totalRow}`).value = { formula: `SUM(E${firstDataRow}:E${totalRow - 1})`, result: totals.occupation };
   sheet.mergeCells(`F${totalRow}:H${totalRow}`);
-  sheet.getCell(`I${totalRow}`).value = { formula: `SUM(I${firstDataRow}:I${totalRow - 1})` };
+  sheet.getCell(`I${totalRow}`).value = { formula: `SUM(I${firstDataRow}:I${totalRow - 1})`, result: totals.dailyQty };
   sheet.getCell(`J${totalRow}`).value = "TOTAL GERAL";
-  sheet.getCell(`K${totalRow}`).value = { formula: `SUM(K${firstDataRow}:K${totalRow - 1})` };
+  sheet.getCell(`K${totalRow}`).value = { formula: `SUM(K${firstDataRow}:K${totalRow - 1})`, result: totals.total };
   sheet.getCell(`K${totalRow}`).numFmt = '"R$" #,##0.00';
 
   for (let col = 1; col <= 11; col += 1) {
@@ -3061,7 +3072,7 @@ async function exportMeasurementAsExcelFile() {
     cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
   }
-  sheet.getRow(totalRow).height = 30;
+  sheet.getRow(totalRow).height = 38;
 
   const lastRow = totalRow;
   for (let r = 1; r <= lastRow; r += 1) {
