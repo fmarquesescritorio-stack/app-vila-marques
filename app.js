@@ -3006,6 +3006,20 @@ function renderMeasurement() {
       </div>
 
       <table class="measurement-table">
+        <colgroup>
+          <col style="width:4%" />
+          <col style="width:18%" />
+          <col style="width:8%" />
+          <col style="width:7%" />
+          <col style="width:7%" />
+          <col style="width:8%" />
+          <col style="width:8%" />
+          <col style="width:7%" />
+          <col style="width:8%" />
+          <col style="width:9%" />
+          <col style="width:9%" />
+          <col class="measurement-hide-pdf" style="width:7%" />
+        </colgroup>
         <thead>
           <tr>
             <th>Item</th>
@@ -3675,7 +3689,7 @@ async function exportProposalAsPdfFile(proposalDocNode) {
   isolatedWrapper.style.position = "fixed";
   isolatedWrapper.style.left = "0";
   isolatedWrapper.style.top = "0";
-  isolatedWrapper.style.width = "210mm";
+  isolatedWrapper.style.width = "297mm";
   isolatedWrapper.style.padding = "0";
   isolatedWrapper.style.margin = "0";
   isolatedWrapper.style.background = "#fff";
@@ -3793,7 +3807,7 @@ async function exportMeasurementAsPdfFile(measurementSheetNode) {
   try {
     await window.html2pdf()
       .set({
-        margin: [8, 8, 8, 8],
+        margin: [6, 6, 6, 6],
         filename,
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: {
