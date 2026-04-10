@@ -2923,79 +2923,168 @@ function getMeasurementTotals(items) {
   });
 }
 
-function exportMeasurementAsExcelFile() {
+async function imageUrlToBase64DataUrl(url) {
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) return "";
+    const blob = await response.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(String(reader.result || ""));
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(blob);
+    });
+  } catch (_error) {
+    return "";
+  }
+}
+
+async function exportMeasurementAsExcelFile() {
   const measurement = state.measurement || {};
   const items = (measurement.items || [])
     .map((item, index) => normalizeMeasurementItem(item, index))
     .filter((item) => item.address);
   if (!items.length) return false;
 
+  const hasExcelJs = await ensureExcelJsBundle();
+  if (!hasExcelJs || !window.ExcelJS) return false;
+
   const totals = getMeasurementTotals(items);
   const headerPeriod = `${formatDateBR(measurement.periodStart)} a ${formatDateBR(measurement.periodEnd)}`;
   const clientName = sanitizeFilenamePart(measurement.clientName || "Sem cliente", "Sem cliente");
   const dateLabel = formatDateForFileName(measurement.periodEnd || "");
 
-  const rows = items.map((item) => `
-    <tr>
-      <td>${escapeHtml(item.itemCode)}</td>
-      <td>${escapeHtml(item.address)}</td>
-      <td>${escapeHtml(item.collaboratorLevel || "-")}</td>
-      <td>${item.vacancies}</td>
-      <td>${item.occupation}</td>
-      <td>${formatDateBR(item.periodStart)}</td>
-      <td>${formatDateBR(item.periodEnd)}</td>
-      <td>${item.days}</td>
-      <td>${item.dailyQty}</td>
-      <td>${currencyBRL.format(Number(item.dailyValue || 0))}</td>
-      <td>${currencyBRL.format(Number(item.total || 0))}</td>
-    </tr>
-  `).join("");
+  const workbook = new window.ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Medição", {
+    views: [{ state: "frozen", ySplit: 4 }],
+    pageSetup: {
+      paperSize: 9,
+      orientation: "landscape",
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: { left: 0.2, right: 0.2, top: 0.2, bottom: 0.2, header: 0.15, footer: 0.15 },
+    },
+  });
 
-  const html = `<!doctype html>
-  <html lang="pt-BR">
-    <head>
-      <meta charset="UTF-8" />
-      <style>
-        table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; }
-        th, td { border: 1px solid #111827; padding: 6px; font-size: 12px; }
-        th { background: #f3f4f6; }
-        .title { background: #ebd7c7; font-weight: bold; }
-      </style>
-    </head>
-    <body>
-      <table>
-        <tr><td colspan="11"><strong>${escapeHtml(CONTRACTOR_INFO.companyName)}</strong></td></tr>
-        <tr><td colspan="11">CNPJ: ${escapeHtml(CONTRACTOR_INFO.cnpj)} | Responsável: ${escapeHtml(CONTRACTOR_INFO.responsible)} | Telefone: ${escapeHtml(CONTRACTOR_INFO.phone)}</td></tr>
-        <tr class="title"><td colspan="7">MEDIÇÃO Nº: ${escapeHtml(measurement.measurementNumber || "01")} - ${escapeHtml(measurement.clientName || "CLIENTE NÃO INFORMADO")}</td><td colspan="4">PERÍODO: ${escapeHtml(headerPeriod)}</td></tr>
-        <tr>
-          <th>Item</th>
-          <th>Endereços</th>
-          <th>Nível de colaborador</th>
-          <th>Quant. de vagas</th>
-          <th>Ocupação</th>
-          <th>Início</th>
-          <th>Fim</th>
-          <th>Quant. de dias</th>
-          <th>Quant. de diárias</th>
-          <th>Valor vaga dia</th>
-          <th>Valor total</th>
-        </tr>
-        ${rows}
-        <tr>
-          <td colspan="3"><strong>TOTAL</strong></td>
-          <td><strong>${totals.vacancies}</strong></td>
-          <td><strong>${totals.occupation}</strong></td>
-          <td colspan="3"></td>
-          <td><strong>${totals.dailyQty}</strong></td>
-          <td><strong>TOTAL GERAL</strong></td>
-          <td><strong>${currencyBRL.format(totals.total)}</strong></td>
-        </tr>
-      </table>
-    </body>
-  </html>`;
+  sheet.columns = [
+    { key: "A", width: 7 },
+    { key: "B", width: 41 },
+    { key: "C", width: 15 },
+    { key: "D", width: 11 },
+    { key: "E", width: 10 },
+    { key: "F", width: 12 },
+    { key: "G", width: 12 },
+    { key: "H", width: 11 },
+    { key: "I", width: 11 },
+    { key: "J", width: 12 },
+    { key: "K", width: 14 },
+  ];
 
-  const blob = new Blob([`\uFEFF${html}`], { type: "application/vnd.ms-excel;charset=utf-8" });
-  downloadBlob(`Medicao - ${clientName} - ${dateLabel}.xls`, blob);
+  sheet.mergeCells("A1:B2");
+  sheet.mergeCells("C1:K2");
+  sheet.getCell("C1").value = `${CONTRACTOR_INFO.companyName}\nCNPJ: ${CONTRACTOR_INFO.cnpj}\nResponsável: ${CONTRACTOR_INFO.responsible}\nTelefone: ${CONTRACTOR_INFO.phone}`;
+  sheet.getCell("C1").alignment = { vertical: "middle", horizontal: "left", wrapText: true };
+  sheet.getCell("C1").font = { name: "Calibri", size: 13, bold: true };
+
+  sheet.mergeCells("A3:G3");
+  sheet.mergeCells("H3:K3");
+  sheet.getCell("A3").value = `MEDIÇÃO Nº: ${measurement.measurementNumber || "01"} - ${measurement.clientName || "CLIENTE NÃO INFORMADO"}`;
+  sheet.getCell("H3").value = `PERÍODO: ${headerPeriod}`;
+  ["A3", "H3"].forEach((ref) => {
+    const cell = sheet.getCell(ref);
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEBD7C7" } };
+    cell.font = { name: "Calibri", size: 12, bold: true };
+    cell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
+  });
+
+  const headerRowIndex = 4;
+  const headers = [
+    "ITEM",
+    "ENDEREÇOS",
+    "NÍVEL DE COLABORADOR",
+    "QUANT. DE VAGAS",
+    "OCUPAÇÃO",
+    "INÍCIO",
+    "FIM",
+    "QUANT. DE DIAS",
+    "QUANT. DE DIÁRIAS",
+    "VALOR VAGA DIA",
+    "VALOR TOTAL",
+  ];
+  headers.forEach((label, index) => {
+    const cell = sheet.getCell(headerRowIndex, index + 1);
+    cell.value = label;
+    cell.font = { name: "Calibri", size: 12, bold: true };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+  });
+  sheet.getRow(headerRowIndex).height = 40;
+
+  const firstDataRow = headerRowIndex + 1;
+  items.forEach((item, index) => {
+    const rowIndex = firstDataRow + index;
+    sheet.getCell(rowIndex, 1).value = item.itemCode;
+    sheet.getCell(rowIndex, 2).value = item.address;
+    sheet.getCell(rowIndex, 3).value = item.collaboratorLevel || "-";
+    sheet.getCell(rowIndex, 4).value = Number(item.vacancies || 0);
+    sheet.getCell(rowIndex, 5).value = Number(item.occupation || 0);
+    sheet.getCell(rowIndex, 6).value = formatDateBR(item.periodStart);
+    sheet.getCell(rowIndex, 7).value = formatDateBR(item.periodEnd);
+    sheet.getCell(rowIndex, 8).value = Number(item.days || 0);
+    sheet.getCell(rowIndex, 9).value = Number(item.dailyQty || 0);
+    sheet.getCell(rowIndex, 10).value = Number(item.dailyValue || 0);
+    sheet.getCell(rowIndex, 11).value = { formula: `I${rowIndex}*J${rowIndex}` };
+    sheet.getCell(rowIndex, 2).alignment = { vertical: "top", horizontal: "left", wrapText: true };
+    sheet.getCell(rowIndex, 10).numFmt = '"R$" #,##0.00';
+    sheet.getCell(rowIndex, 11).numFmt = '"R$" #,##0.00';
+    for (let col = 1; col <= 11; col += 1) {
+      if (col !== 2) sheet.getCell(rowIndex, col).alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    }
+    sheet.getRow(rowIndex).height = 54;
+  });
+
+  const totalRow = firstDataRow + items.length;
+  sheet.mergeCells(`A${totalRow}:C${totalRow}`);
+  sheet.getCell(`A${totalRow}`).value = "TOTAL";
+  sheet.getCell(`D${totalRow}`).value = { formula: `SUM(D${firstDataRow}:D${totalRow - 1})` };
+  sheet.getCell(`E${totalRow}`).value = { formula: `SUM(E${firstDataRow}:E${totalRow - 1})` };
+  sheet.mergeCells(`F${totalRow}:H${totalRow}`);
+  sheet.getCell(`I${totalRow}`).value = { formula: `SUM(I${firstDataRow}:I${totalRow - 1})` };
+  sheet.getCell(`J${totalRow}`).value = "TOTAL GERAL";
+  sheet.getCell(`K${totalRow}`).value = { formula: `SUM(K${firstDataRow}:K${totalRow - 1})` };
+  sheet.getCell(`K${totalRow}`).numFmt = '"R$" #,##0.00';
+
+  for (let col = 1; col <= 11; col += 1) {
+    const cell = sheet.getCell(totalRow, col);
+    cell.font = { name: "Calibri", size: 12, bold: true };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+  }
+  sheet.getRow(totalRow).height = 30;
+
+  const lastRow = totalRow;
+  for (let r = 1; r <= lastRow; r += 1) {
+    for (let c = 1; c <= 11; c += 1) {
+      sheet.getCell(r, c).border = {
+        top: { style: "thin", color: { argb: "FF111827" } },
+        left: { style: "thin", color: { argb: "FF111827" } },
+        bottom: { style: "thin", color: { argb: "FF111827" } },
+        right: { style: "thin", color: { argb: "FF111827" } },
+      };
+    }
+  }
+
+  const logoDataUrl = await imageUrlToBase64DataUrl(FIXED_LOGO_PATH);
+  if (logoDataUrl.startsWith("data:image")) {
+    const extension = logoDataUrl.includes("image/jpeg") ? "jpeg" : "png";
+    const imageId = workbook.addImage({ base64: logoDataUrl, extension });
+    sheet.addImage(imageId, "A1:B2");
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  downloadBlob(`Medicao - ${clientName} - ${dateLabel}.xlsx`, blob);
   return true;
 }
 
@@ -3728,6 +3817,16 @@ async function ensureHtml2PdfBundle() {
     return false;
   }
   return Boolean(window.html2pdf);
+}
+
+async function ensureExcelJsBundle() {
+  if (window.ExcelJS) return true;
+  try {
+    await loadExternalScript("https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js");
+  } catch (_error) {
+    return false;
+  }
+  return Boolean(window.ExcelJS);
 }
 
 function sanitizeFilenamePart(value, fallback = "sem-dado") {
@@ -9889,10 +9988,10 @@ function bindEvents() {
     }
   });
 
-  document.getElementById("btnExportMeasurementExcel")?.addEventListener("click", () => {
-    const exported = exportMeasurementAsExcelFile();
+  document.getElementById("btnExportMeasurementExcel")?.addEventListener("click", async () => {
+    const exported = await exportMeasurementAsExcelFile();
     if (!exported) {
-      alert("Adicione ao menos um item na planilha antes de exportar.");
+      alert("Não foi possível exportar em Excel. Verifique se há itens na planilha e tente novamente.");
     }
   });
 
