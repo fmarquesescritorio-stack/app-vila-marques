@@ -22,6 +22,7 @@ const ALLOW_PUBLIC_SIGNUP = false;
 const FIXED_LOGO_PATH = "/assets/logo-vila-marques.png";
 const CONTRACTOR_INFO = {
   companyName: "Vila Marques Alojamentos",
+  legalName: "Vila Marques Alojamentos Servicos LTDA",
   cnpj: "58.924.922/0001-75",
   responsible: "Fred Marques",
   phone: "(31) 99578-5160",
@@ -2987,9 +2988,18 @@ async function exportMeasurementAsExcelFile() {
 
   sheet.mergeCells("A1:B2");
   sheet.mergeCells("C1:K2");
-  sheet.getCell("C1").value = `${CONTRACTOR_INFO.companyName}\nCNPJ: ${CONTRACTOR_INFO.cnpj}\nResponsável: ${CONTRACTOR_INFO.responsible}\nTelefone: ${CONTRACTOR_INFO.phone}${CONTRACTOR_INFO.email ? ` | E-mail: ${CONTRACTOR_INFO.email}` : ""}`;
+  sheet.getCell("C1").value = {
+    richText: [
+      { text: `${CONTRACTOR_INFO.legalName || CONTRACTOR_INFO.companyName}\n`, font: { name: "Calibri", size: 12, bold: true } },
+      { text: `CNPJ: ${CONTRACTOR_INFO.cnpj}\n`, font: { name: "Calibri", size: 12, bold: false } },
+      { text: `Responsável: ${CONTRACTOR_INFO.responsible}\n`, font: { name: "Calibri", size: 12, bold: false } },
+      {
+        text: `Telefone: ${CONTRACTOR_INFO.phone}${CONTRACTOR_INFO.email ? ` | E-mail: ${CONTRACTOR_INFO.email}` : ""}`,
+        font: { name: "Calibri", size: 12, bold: false },
+      },
+    ],
+  };
   sheet.getCell("C1").alignment = { vertical: "middle", horizontal: "left", wrapText: true };
-  sheet.getCell("C1").font = { name: "Calibri", size: 12, bold: true };
   sheet.getRow(1).height = 44;
   sheet.getRow(2).height = 44;
 
@@ -3040,7 +3050,14 @@ async function exportMeasurementAsExcelFile() {
     sheet.getCell(rowIndex, 5).value = Number(item.occupation || 0);
     sheet.getCell(rowIndex, 6).value = startDate || formatDateBR(item.periodStart);
     sheet.getCell(rowIndex, 7).value = endDate || formatDateBR(item.periodEnd);
-    sheet.getCell(rowIndex, 8).value = Number(item.days || 0);
+    if (startDate && endDate) {
+      sheet.getCell(rowIndex, 8).value = {
+        formula: `MAX(0,G${rowIndex}-F${rowIndex}+1)`,
+        result: Number(item.days || 0),
+      };
+    } else {
+      sheet.getCell(rowIndex, 8).value = Number(item.days || 0);
+    }
     sheet.getCell(rowIndex, 9).value = { formula: `D${rowIndex}*H${rowIndex}`, result: Number(item.dailyQty || 0) };
     sheet.getCell(rowIndex, 10).value = Number(item.dailyValue || 0);
     sheet.getCell(rowIndex, 11).value = { formula: `I${rowIndex}*J${rowIndex}`, result: Number(item.total || 0) };
@@ -3090,7 +3107,11 @@ async function exportMeasurementAsExcelFile() {
   if (logoDataUrl.startsWith("data:image")) {
     const extension = logoDataUrl.includes("image/jpeg") ? "jpeg" : "png";
     const imageId = workbook.addImage({ base64: logoDataUrl, extension });
-    sheet.addImage(imageId, "A1:B2");
+    sheet.addImage(imageId, {
+      tl: { col: 0.12, row: 0.12 },
+      ext: { width: 235, height: 82 },
+      editAs: "oneCell",
+    });
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
