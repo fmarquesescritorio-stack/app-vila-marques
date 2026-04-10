@@ -3043,16 +3043,36 @@ async function exportMeasurementAsExcelFile() {
     const rowIndex = firstDataRow + index;
     const startDate = parseISODateOnly(item.periodStart);
     const endDate = parseISODateOnly(item.periodEnd);
+    const startYear = startDate ? startDate.getFullYear() : 0;
+    const startMonth = startDate ? startDate.getMonth() + 1 : 0;
+    const startDay = startDate ? startDate.getDate() : 0;
+    const endYear = endDate ? endDate.getFullYear() : 0;
+    const endMonth = endDate ? endDate.getMonth() + 1 : 0;
+    const endDay = endDate ? endDate.getDate() : 0;
     sheet.getCell(rowIndex, 1).value = item.itemCode;
     sheet.getCell(rowIndex, 2).value = item.address;
     sheet.getCell(rowIndex, 3).value = item.collaboratorLevel || "-";
     sheet.getCell(rowIndex, 4).value = Number(item.vacancies || 0);
     sheet.getCell(rowIndex, 5).value = Number(item.occupation || 0);
-    sheet.getCell(rowIndex, 6).value = startDate || formatDateBR(item.periodStart);
-    sheet.getCell(rowIndex, 7).value = endDate || formatDateBR(item.periodEnd);
+    if (startDate) {
+      sheet.getCell(rowIndex, 6).value = {
+        formula: `DATE(${startYear},${startMonth},${startDay})`,
+        result: startDate,
+      };
+    } else {
+      sheet.getCell(rowIndex, 6).value = formatDateBR(item.periodStart);
+    }
+    if (endDate) {
+      sheet.getCell(rowIndex, 7).value = {
+        formula: `DATE(${endYear},${endMonth},${endDay})`,
+        result: endDate,
+      };
+    } else {
+      sheet.getCell(rowIndex, 7).value = formatDateBR(item.periodEnd);
+    }
     if (startDate && endDate) {
       sheet.getCell(rowIndex, 8).value = {
-        formula: `MAX(0,G${rowIndex}-F${rowIndex}+1)`,
+        formula: `G${rowIndex}-F${rowIndex}+1`,
         result: Number(item.days || 0),
       };
     } else {
@@ -3064,6 +3084,8 @@ async function exportMeasurementAsExcelFile() {
     sheet.getCell(rowIndex, 2).alignment = { vertical: "top", horizontal: "left", wrapText: true };
     sheet.getCell(rowIndex, 6).numFmt = "dd/mm/yyyy";
     sheet.getCell(rowIndex, 7).numFmt = "dd/mm/yyyy";
+    sheet.getCell(rowIndex, 8).numFmt = "0";
+    sheet.getCell(rowIndex, 9).numFmt = "0";
     sheet.getCell(rowIndex, 10).numFmt = '"R$" #,##0.00';
     sheet.getCell(rowIndex, 11).numFmt = '"R$" #,##0.00';
     for (let col = 1; col <= 11; col += 1) {
@@ -3108,8 +3130,8 @@ async function exportMeasurementAsExcelFile() {
     const extension = logoDataUrl.includes("image/jpeg") ? "jpeg" : "png";
     const imageId = workbook.addImage({ base64: logoDataUrl, extension });
     sheet.addImage(imageId, {
-      tl: { col: 0.12, row: 0.12 },
-      ext: { width: 235, height: 82 },
+      tl: { col: 0.15, row: 0.22 },
+      ext: { width: 285, height: 71 },
       editAs: "oneCell",
     });
   }
