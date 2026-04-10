@@ -813,6 +813,11 @@
         <section class="panel">
           <h2>Planilha de Medição</h2>
           <form id="measurementForm" class="form-grid">
+            <label>Cliente salvo
+              <select id="measurementClientSelect" name="clientId">
+                <option value="">Selecionar cliente salvo</option>
+              </select>
+            </label>
             <label>Nº da medição
               <input name="measurementNumber" placeholder="Ex.: 01" />
             </label>
@@ -826,7 +831,9 @@
               <input name="periodEnd" type="date" />
             </label>
             <div class="full row-end">
+              <button id="btnUseMeasurementClient" class="btn" type="button">Usar cliente salvo</button>
               <button class="btn" type="submit">Salvar cabeçalho</button>
+              <button id="btnExportMeasurementExcel" class="btn" type="button">Exportar medição em Excel</button>
               <button id="btnExportMeasurementPdf" class="btn btn-primary" type="button">Exportar medição em PDF</button>
             </div>
           </form>

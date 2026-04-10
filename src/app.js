@@ -112,6 +112,7 @@ const state = {
   rentedProperties: [],
   measurement: {
     measurementNumber: "01",
+    clientId: "",
     clientName: "",
     periodStart: "",
     periodEnd: "",
@@ -1215,6 +1216,9 @@ function normalizeStatePatterns() {
   state.measurement = {
     ...state.measurement,
     measurementNumber: String(state.measurement?.measurementNumber || "01").trim() || "01",
+    clientId: clientIds.has(String(state.measurement?.clientId || "").trim())
+      ? String(state.measurement?.clientId || "").trim()
+      : "",
     clientName: String(state.measurement?.clientName || "").trim(),
     periodStart: String(state.measurement?.periodStart || "").trim(),
     periodEnd: String(state.measurement?.periodEnd || "").trim(),
@@ -2418,6 +2422,7 @@ function resetActiveTabInputs() {
   if (uiState.activeTab === "measurement") {
     state.measurement = {
       measurementNumber: "01",
+      clientId: "",
       clientName: "",
       periodStart: "",
       periodEnd: "",
@@ -2916,6 +2921,82 @@ function getMeasurementTotals(items) {
     dailyQty: 0,
     total: 0,
   });
+}
+
+function exportMeasurementAsExcelFile() {
+  const measurement = state.measurement || {};
+  const items = (measurement.items || [])
+    .map((item, index) => normalizeMeasurementItem(item, index))
+    .filter((item) => item.address);
+  if (!items.length) return false;
+
+  const totals = getMeasurementTotals(items);
+  const headerPeriod = `${formatDateBR(measurement.periodStart)} a ${formatDateBR(measurement.periodEnd)}`;
+  const clientName = sanitizeFilenamePart(measurement.clientName || "Sem cliente", "Sem cliente");
+  const dateLabel = formatDateForFileName(measurement.periodEnd || "");
+
+  const rows = items.map((item) => `
+    <tr>
+      <td>${escapeHtml(item.itemCode)}</td>
+      <td>${escapeHtml(item.address)}</td>
+      <td>${escapeHtml(item.collaboratorLevel || "-")}</td>
+      <td>${item.vacancies}</td>
+      <td>${item.occupation}</td>
+      <td>${formatDateBR(item.periodStart)}</td>
+      <td>${formatDateBR(item.periodEnd)}</td>
+      <td>${item.days}</td>
+      <td>${item.dailyQty}</td>
+      <td>${currencyBRL.format(Number(item.dailyValue || 0))}</td>
+      <td>${currencyBRL.format(Number(item.total || 0))}</td>
+    </tr>
+  `).join("");
+
+  const html = `<!doctype html>
+  <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8" />
+      <style>
+        table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; }
+        th, td { border: 1px solid #111827; padding: 6px; font-size: 12px; }
+        th { background: #f3f4f6; }
+        .title { background: #ebd7c7; font-weight: bold; }
+      </style>
+    </head>
+    <body>
+      <table>
+        <tr><td colspan="11"><strong>${escapeHtml(CONTRACTOR_INFO.companyName)}</strong></td></tr>
+        <tr><td colspan="11">CNPJ: ${escapeHtml(CONTRACTOR_INFO.cnpj)} | Responsável: ${escapeHtml(CONTRACTOR_INFO.responsible)} | Telefone: ${escapeHtml(CONTRACTOR_INFO.phone)}</td></tr>
+        <tr class="title"><td colspan="7">MEDIÇÃO Nº: ${escapeHtml(measurement.measurementNumber || "01")} - ${escapeHtml(measurement.clientName || "CLIENTE NÃO INFORMADO")}</td><td colspan="4">PERÍODO: ${escapeHtml(headerPeriod)}</td></tr>
+        <tr>
+          <th>Item</th>
+          <th>Endereços</th>
+          <th>Nível de colaborador</th>
+          <th>Quant. de vagas</th>
+          <th>Ocupação</th>
+          <th>Início</th>
+          <th>Fim</th>
+          <th>Quant. de dias</th>
+          <th>Quant. de diárias</th>
+          <th>Valor vaga dia</th>
+          <th>Valor total</th>
+        </tr>
+        ${rows}
+        <tr>
+          <td colspan="3"><strong>TOTAL</strong></td>
+          <td><strong>${totals.vacancies}</strong></td>
+          <td><strong>${totals.occupation}</strong></td>
+          <td colspan="3"></td>
+          <td><strong>${totals.dailyQty}</strong></td>
+          <td><strong>TOTAL GERAL</strong></td>
+          <td><strong>${currencyBRL.format(totals.total)}</strong></td>
+        </tr>
+      </table>
+    </body>
+  </html>`;
+
+  const blob = new Blob([`\uFEFF${html}`], { type: "application/vnd.ms-excel;charset=utf-8" });
+  downloadBlob(`Medicao - ${clientName} - ${dateLabel}.xls`, blob);
+  return true;
 }
 
 function normalizeMeasurementItem(item, index = 0) {
@@ -5774,6 +5855,7 @@ function renderClientSelects() {
   const proposalEntrySelect = document.getElementById("proposalEntryClientSelect");
   const proposalSelect = document.getElementById("proposalClientSelect");
   const contractsSelect = document.getElementById("contractsClientSelect");
+  const measurementSelect = document.getElementById("measurementClientSelect");
   const contractsRentedPropertySelect = document.getElementById("contractsRentedPropertySelect");
   const rentedPropertyContractSelect = document.getElementById("rentedPropertyContractSelect");
   const options = [...(state.clients || [])]
@@ -5800,6 +5882,10 @@ function renderClientSelects() {
   if (contractsSelect) {
     contractsSelect.innerHTML = `<option value="">Selecionar cliente salvo</option>${options}`;
     contractsSelect.value = String(state.contracts.clientId || "");
+  }
+  if (measurementSelect) {
+    measurementSelect.innerHTML = `<option value="">Selecionar cliente salvo</option>${options}`;
+    measurementSelect.value = String(state.measurement?.clientId || "");
   }
   if (contractsRentedPropertySelect) {
     contractsRentedPropertySelect.innerHTML = `<option value="">Selecionar imóvel alugado</option>${rentedPropertyOptions}`;
@@ -5910,6 +5996,18 @@ function useClientInProposal(clientId) {
     email: client.clientEmail || "",
     city: client.clientCity || "",
     notes: client.clientNotes || "",
+  };
+  saveState();
+  renderAll();
+}
+
+function useClientInMeasurement(clientId) {
+  const client = getClientById(clientId);
+  if (!client) return;
+  state.measurement = {
+    ...state.measurement,
+    clientId: client.id,
+    clientName: String(client.clientName || "").trim(),
   };
   saveState();
   renderAll();
@@ -8064,6 +8162,16 @@ function bindEvents() {
     useClientInProposal(clientId);
   });
 
+  document.getElementById("btnUseMeasurementClient")?.addEventListener("click", () => {
+    const select = document.getElementById("measurementClientSelect");
+    const clientId = String(select?.value || "");
+    if (!clientId) {
+      alert("Selecione um cliente salvo para usar na medição.");
+      return;
+    }
+    useClientInMeasurement(clientId);
+  });
+
   const clientCatalogForm = document.getElementById("clientCatalogForm");
   const persistClientCatalogForm = () => {
     const data = formToObject(clientCatalogForm);
@@ -8277,15 +8385,21 @@ function bindEvents() {
   if (measurementForm) {
     const persistMeasurementHeader = () => {
       const data = formToObject(measurementForm);
+      const nextClientId = String(data.clientId || "").trim();
+      const selectedClient = nextClientId ? getClientById(nextClientId) : null;
+      const typedClientName = String(data.clientName || "").trim();
+      const selectedClientName = String(selectedClient?.clientName || "").trim();
+      const keepSelectedClient = nextClientId && selectedClient && (!typedClientName || typedClientName === selectedClientName);
       state.measurement = {
         ...state.measurement,
         measurementNumber: String(data.measurementNumber || "01").trim() || "01",
-        clientName: String(data.clientName || "").trim(),
+        clientId: keepSelectedClient ? nextClientId : "",
+        clientName: keepSelectedClient ? selectedClientName : typedClientName,
         periodStart: String(data.periodStart || "").trim(),
         periodEnd: String(data.periodEnd || "").trim(),
       };
       saveState();
-      renderMeasurement();
+      renderAll();
     };
     measurementForm.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -9772,6 +9886,13 @@ function bindEvents() {
     if (exportBtn) {
       exportBtn.disabled = false;
       exportBtn.textContent = "Exportar medição em PDF";
+    }
+  });
+
+  document.getElementById("btnExportMeasurementExcel")?.addEventListener("click", () => {
+    const exported = exportMeasurementAsExcelFile();
+    if (!exported) {
+      alert("Adicione ao menos um item na planilha antes de exportar.");
     }
   });
 
