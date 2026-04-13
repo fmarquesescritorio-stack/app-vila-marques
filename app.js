@@ -3145,9 +3145,11 @@ async function exportMeasurementAsExcelFile() {
 function normalizeMeasurementItem(item, index = 0) {
   const vacancies = Math.max(0, Number(item?.vacancies || 0));
   const occupation = Math.max(0, Number(item?.occupation || 0));
-  const days = Math.max(0, Number(item?.days || 0));
-  const dailyQtyRaw = Math.max(0, Number(item?.dailyQty || 0));
-  const dailyQty = dailyQtyRaw > 0 ? dailyQtyRaw : (vacancies * days);
+  const periodStart = String(item?.periodStart || "").trim();
+  const periodEnd = String(item?.periodEnd || "").trim();
+  const derived = calculateMeasurementDerivedValues({ vacancies, periodStart, periodEnd });
+  const days = derived.days;
+  const dailyQty = derived.dailyQty;
   const dailyValue = Math.max(0, Number(item?.dailyValue || 0));
   const total = dailyQty * dailyValue;
   return {
@@ -3157,8 +3159,8 @@ function normalizeMeasurementItem(item, index = 0) {
     collaboratorLevel: String(item?.collaboratorLevel || "").trim(),
     vacancies,
     occupation,
-    periodStart: String(item?.periodStart || "").trim(),
-    periodEnd: String(item?.periodEnd || "").trim(),
+    periodStart,
+    periodEnd,
     days,
     dailyQty,
     dailyValue,
@@ -3172,6 +3174,16 @@ function calculateInclusiveDaysBetween(startISO, endISO) {
   if (!start || !end) return 0;
   const diff = Math.floor((end.getTime() - start.getTime()) / 86400000);
   return diff >= 0 ? diff + 1 : 0;
+}
+
+function calculateMeasurementDerivedValues({ vacancies, periodStart, periodEnd }) {
+  const safeVacancies = Math.max(0, Number(vacancies || 0));
+  const days = Math.max(0, calculateInclusiveDaysBetween(periodStart, periodEnd));
+  const dailyQty = safeVacancies * days;
+  return {
+    days,
+    dailyQty,
+  };
 }
 
 function renderMeasurement() {
@@ -8569,6 +8581,24 @@ function bindEvents() {
   const measurementItemForm = document.getElementById("measurementItemForm");
   if (measurementItemForm) {
     setupBRLInputs(measurementItemForm);
+    const syncMeasurementItemCalculatedFields = () => {
+      const vacancies = Number(measurementItemForm.elements.namedItem("vacancies")?.value || 0);
+      const periodStart = String(measurementItemForm.elements.namedItem("periodStart")?.value || "").trim();
+      const periodEnd = String(measurementItemForm.elements.namedItem("periodEnd")?.value || "").trim();
+      const derived = calculateMeasurementDerivedValues({ vacancies, periodStart, periodEnd });
+      const daysInput = measurementItemForm.elements.namedItem("days");
+      const dailyQtyInput = measurementItemForm.elements.namedItem("dailyQty");
+      if (daysInput) daysInput.value = String(derived.days);
+      if (dailyQtyInput) dailyQtyInput.value = String(derived.dailyQty);
+    };
+
+    measurementItemForm.addEventListener("input", () => {
+      syncMeasurementItemCalculatedFields();
+    });
+    measurementItemForm.addEventListener("change", () => {
+      syncMeasurementItemCalculatedFields();
+    });
+
     measurementItemForm.addEventListener("submit", (event) => {
       event.preventDefault();
       const data = formToObject(measurementItemForm);
@@ -8579,12 +8609,8 @@ function bindEvents() {
       }
       const periodStart = String(data.periodStart || state.measurement?.periodStart || "").trim();
       const periodEnd = String(data.periodEnd || state.measurement?.periodEnd || "").trim();
-      const daysInput = Number(data.days || 0);
-      const autoDays = calculateInclusiveDaysBetween(periodStart, periodEnd);
-      const days = daysInput > 0 ? daysInput : autoDays;
       const vacancies = Math.max(0, Number(data.vacancies || 0));
-      const dailyQtyInput = Math.max(0, Number(data.dailyQty || 0));
-      const dailyQty = dailyQtyInput > 0 ? dailyQtyInput : (vacancies * Math.max(0, days));
+      const derived = calculateMeasurementDerivedValues({ vacancies, periodStart, periodEnd });
       const nextItem = {
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         address,
@@ -8593,8 +8619,8 @@ function bindEvents() {
         occupation: Math.max(0, Number(data.occupation || 0)),
         periodStart,
         periodEnd,
-        days: Math.max(0, Number(days || 0)),
-        dailyQty,
+        days: derived.days,
+        dailyQty: derived.dailyQty,
         dailyValue: parseBRLNumber(data.dailyValue || 0),
       };
       state.measurement = {
@@ -8612,7 +8638,7 @@ function bindEvents() {
         measurementItemForm.elements.namedItem("periodEnd").value = defaultEnd;
       }
       if (measurementItemForm.elements.namedItem("days")) {
-        measurementItemForm.elements.namedItem("days").value = "30";
+        measurementItemForm.elements.namedItem("days").value = "0";
       }
       if (measurementItemForm.elements.namedItem("dailyQty")) {
         measurementItemForm.elements.namedItem("dailyQty").value = "0";
@@ -8621,8 +8647,10 @@ function bindEvents() {
         measurementItemForm.elements.namedItem("dailyValue").value = "R$ 0,00";
       }
       setupBRLInputs(measurementItemForm);
+      syncMeasurementItemCalculatedFields();
       renderMeasurement();
     });
+    syncMeasurementItemCalculatedFields();
   }
 
   const payslipForm = document.getElementById("payslipForm");
