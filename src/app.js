@@ -10214,6 +10214,23 @@ function bindEvents() {
 }
 
 async function initializeApp() {
+  // ── Tema (dark/light mode) ──────────────────────────────
+  const THEME_KEY = "vm-theme";
+  function applyTheme(dark) {
+    document.body.classList.toggle("dark-mode", dark);
+    const btn = document.getElementById("btnThemeToggle");
+    if (btn) btn.textContent = dark ? "☀️" : "🌙";
+  }
+  const savedTheme = localStorage.getItem(THEME_KEY);
+  applyTheme(savedTheme === "dark");
+  document.addEventListener("click", (e) => {
+    if (e.target && e.target.id === "btnThemeToggle") {
+      const isDark = document.body.classList.contains("dark-mode");
+      applyTheme(!isDark);
+      localStorage.setItem(THEME_KEY, !isDark ? "dark" : "light");
+    }
+  });
+  // ───────────────────────────────────────────────────────
   loadState();
   normalizeStatePatterns();
   bindEvents();
