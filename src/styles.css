@@ -2008,3 +2008,19 @@ body.balance-values-blurred #balanceModule .month-profit {
   }
   @page { size: A4; margin: 6mm; }
 }
+
+/* Claude integration badge */
+.claude-badge {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+  color: #a78bfa;
+  font-size: 11px;
+  text-align: center;
+  padding: 4px 12px;
+  letter-spacing: 0.04em;
+  z-index: 9999;
+  pointer-events: none;
+}
