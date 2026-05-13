@@ -7703,29 +7703,152 @@ function renderHomeDashboard() {
   const name = authState.user ? getUserDisplayNameFromEmail() : "usuário";
   greeting.textContent = `Olá ${name}, o que você precisa fazer agora?`;
 
-  const items = [
-    { tab: "proposals", title: "Propostas Comerciais", description: "Criar, editar e exportar propostas." },
-    { tab: "clients", title: "Clientes", description: "Consultar e gerenciar clientes." },
-    { tab: "employees", title: "Funcionários", description: "Consultar e gerenciar funcionários." },
-    { tab: "payslip", title: "Contracheque", description: "Gerar e exportar contracheques." },
-    { tab: "balance", title: "Balanço", description: "Lançar entradas/saídas e acompanhar resultados." },
-    { tab: "taxes", title: "Impostos", description: "Registrar faturamento, impostos e alíquota." },
-    { tab: "contracts", title: "Contratos", description: "Gerenciar contratos e recebimentos." },
-    { tab: "measurement", title: "Medição", description: "Montar planilhas de medição e exportar PDF." },
-    { tab: "rentedProperties", title: "Imóveis Alugados", description: "Controlar alugueis e vencimentos." },
-    { tab: "exports", title: "Exportados", description: "Acessar documentos exportados." },
-  ].filter((item) => canAccessTab(item.tab));
+  // ── Métricas ─────────────────────────────────────────────────────────────
+  const contracts = (state.contractsPortfolio || []);
+  const activeContracts = contracts.filter(c => c.isEffective);
+  const pendingContracts = contracts.filter(c => !c.isEffective);
 
-  grid.innerHTML = items
-    .map(
-      (item) => `
-      <button type="button" class="home-module-card" data-home-tab="${item.tab}">
-        <strong>${item.title}</strong>
-        <span>${item.description}</span>
-      </button>
-    `,
-    )
-    .join("");
+  const rentedProperties = (state.rentedProperties || []);
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const next7 = new Date(today); next7.setDate(today.getDate() + 7);
+
+  // Vencimentos próximos (imóveis com nextDueDateISO nos próximos 7 dias)
+  const upcomingDue = rentedProperties.filter(p => {
+    if (!p.nextDueDateISO) return false;
+    const d = new Date(p.nextDueDateISO + "T00:00:00");
+    return d >= today && d <= next7;
+  });
+
+  // Receita mensal estimada (soma dos contratos ativos: capacity * dailyRatePerPerson * 30 * (1 - tax))
+  const monthlyRevenue = activeContracts.reduce((sum, c) => {
+    const cap = parseFloat(c.capacity) || 0;
+    const rate = parseFloat(c.dailyRatePerPerson) || 0;
+    const tax = (parseFloat(c.monthlyTaxPercent) || 0) / 100;
+    return sum + (cap * rate * 30 * (1 - tax));
+  }, 0);
+
+  // Receita por mês (últimos 6 meses das entradas do balanço)
+  const entries = (state.balance?.entries || []);
+  const monthLabels = [];
+  const monthValues = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const label = d.toLocaleString("pt-BR", { month: "short" });
+    monthLabels.push(label.charAt(0).toUpperCase() + label.slice(1));
+    const total = entries
+      .filter(e => e.type === "income" || e.category === "receita" || e.amount > 0)
+      .filter(e => {
+        const ed = new Date(e.date || e.createdAt || "");
+        return ed.getFullYear() === y && (ed.getMonth() + 1) === m;
+      })
+      .reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+    monthValues.push(total);
+  }
+  const maxVal = Math.max(...monthValues, 1);
+
+  // ── Módulos ───────────────────────────────────────────────────────────────
+  const items = [
+    { tab: "proposals",        title: "Propostas Comerciais", description: "Criar, editar e exportar propostas." },
+    { tab: "clients",          title: "Clientes",             description: "Consultar e gerenciar clientes." },
+    { tab: "employees",        title: "Funcionários",         description: "Consultar e gerenciar funcionários." },
+    { tab: "payslip",          title: "Contracheque",         description: "Gerar e exportar contracheques." },
+    { tab: "balance",          title: "Balanço",              description: "Lançar entradas/saídas e acompanhar resultados." },
+    { tab: "taxes",            title: "Impostos",             description: "Registrar faturamento, impostos e alíquota." },
+    { tab: "contracts",        title: "Contratos",            description: "Gerenciar contratos e recebimentos." },
+    { tab: "measurement",      title: "Medição",              description: "Montar planilhas de medição e exportar PDF." },
+    { tab: "rentedProperties", title: "Imóveis Alugados",     description: "Controlar alugueis e vencimentos." },
+    { tab: "exports",          title: "Exportados",           description: "Acessar documentos exportados." },
+  ].filter(item => canAccessTab(item.tab));
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  grid.innerHTML = `
+    <div class="dash-metrics">
+      <div class="dash-metric-card">
+        <div class="dash-metric-label">Contratos ativos</div>
+        <div class="dash-metric-value dash-metric-accent">${activeContracts.length}</div>
+        <div class="dash-metric-sub">${pendingContracts.length > 0 ? `+${pendingContracts.length} pendente${pendingContracts.length > 1 ? "s" : ""}` : "Todos efetivos"}</div>
+      </div>
+      <div class="dash-metric-card">
+        <div class="dash-metric-label">Receita mensal est.</div>
+        <div class="dash-metric-value">${monthlyRevenue > 0 ? currencyBRL.format(monthlyRevenue) : "—"}</div>
+        <div class="dash-metric-sub">Contratos efetivos</div>
+      </div>
+      <div class="dash-metric-card">
+        <div class="dash-metric-label">Imóveis alugados</div>
+        <div class="dash-metric-value">${rentedProperties.length}</div>
+        <div class="dash-metric-sub">Cadastrados</div>
+      </div>
+      <div class="dash-metric-card ${upcomingDue.length > 0 ? "dash-metric-card--alert" : ""}">
+        <div class="dash-metric-label">Vencimentos</div>
+        <div class="dash-metric-value ${upcomingDue.length > 0 ? "dash-metric-danger" : ""}">${upcomingDue.length}</div>
+        <div class="dash-metric-sub">Próximos 7 dias</div>
+      </div>
+    </div>
+
+    <div class="dash-panels">
+      <div class="dash-panel">
+        <div class="dash-panel-header">
+          <span class="dash-panel-title">Contratos recentes</span>
+          <button type="button" class="dash-panel-link" onclick="document.getElementById('tabContracts')?.click()">ver todos</button>
+        </div>
+        <div class="dash-contracts-list">
+          ${contracts.length === 0
+            ? `<div class="dash-empty">Nenhum contrato cadastrado</div>`
+            : contracts.slice(0, 5).map(c => {
+                const clientName = (state.clients || []).find(cl => cl.id === c.clientId)?.name || c.contractName || "Sem nome";
+                const status = c.isEffective ? "active" : "pending";
+                const statusLabel = c.isEffective ? "Ativo" : "Pendente";
+                const revenue = (() => {
+                  const cap = parseFloat(c.capacity) || 0;
+                  const rate = parseFloat(c.dailyRatePerPerson) || 0;
+                  const tax = (parseFloat(c.monthlyTaxPercent) || 0) / 100;
+                  const val = cap * rate * 30 * (1 - tax);
+                  return val > 0 ? currencyBRL.format(val) : "—";
+                })();
+                return `
+                  <div class="dash-contract-row">
+                    <div class="dash-contract-name">${clientName}</div>
+                    <div class="dash-contract-status dash-status--${status}">${statusLabel}</div>
+                    <div class="dash-contract-value">${revenue}</div>
+                  </div>`;
+              }).join("")
+          }
+        </div>
+      </div>
+
+      <div class="dash-panel">
+        <div class="dash-panel-header">
+          <span class="dash-panel-title">Receita por mês</span>
+        </div>
+        <div class="dash-chart">
+          ${monthLabels.map((label, i) => {
+            const pct = Math.round((monthValues[i] / maxVal) * 100);
+            const hasData = monthValues[i] > 0;
+            return `
+              <div class="dash-bar-row">
+                <div class="dash-bar-label">${label}</div>
+                <div class="dash-bar-track">
+                  <div class="dash-bar-fill ${hasData ? "" : "dash-bar-empty"}" style="width:${hasData ? Math.max(pct, 2) : 0}%"></div>
+                </div>
+                <div class="dash-bar-val">${hasData ? currencyBRL.format(monthValues[i]).replace("R$","").trim() : "—"}</div>
+              </div>`;
+          }).join("")}
+        </div>
+      </div>
+    </div>
+
+    <div class="dash-modules-title">Módulos</div>
+    <div class="home-modules-grid">
+      ${items.map(item => `
+        <button type="button" class="home-module-card" data-home-tab="${item.tab}">
+          <strong>${item.title}</strong>
+          <span>${item.description}</span>
+        </button>`).join("")}
+    </div>
+  `;
 }
 
 function validatePayslipRequiredFields() {
