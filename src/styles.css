@@ -1808,6 +1808,243 @@ body.balance-values-blurred #balanceModule .month-profit {
   }
 }
 
+
+/* ═══════════════════════════════════════════════════
+   DARK MODE — Vila Marques Alojamentos
+   Ativado via body.dark-mode
+═══════════════════════════════════════════════════ */
+
+/* Botão de tema */
+.theme-toggle-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+  padding: 0;
+  transition: background 0.15s;
+}
+.theme-toggle-btn:hover { background: var(--surface, #f8fafc); }
+
+body.dark-mode {
+  --bg: #080a0f;
+  --panel: #0f1219;
+  --primary: #60b8e0;
+  --primary-2: #2d7a5e;
+  --text: #f0f4f8;
+  --muted: #8ba3b8;
+  --danger: #f87171;
+  --border: #1e2535;
+  --surface: #151b27;
+  --card-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  background: #080a0f !important;
+  color: #f0f4f8;
+}
+
+/* Auth */
+body.dark-mode .auth-gate {
+  background: linear-gradient(135deg, #080a0f 0%, #060810 100%) !important;
+}
+body.dark-mode .auth-card {
+  background: #0f1219;
+  border-color: #1e2535;
+  color: #f0f4f8;
+}
+body.dark-mode .auth-step { border-top-color: #1e2535; }
+body.dark-mode .auth-step h3 { color: #60b8e0; }
+
+/* Inputs */
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea {
+  background: #151b27 !important;
+  border-color: #1e2d42 !important;
+  color: #f0f4f8 !important;
+}
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder { color: #4a5a6e; }
+body.dark-mode input:focus,
+body.dark-mode select:focus,
+body.dark-mode textarea:focus {
+  border-color: #60b8e0 !important;
+  box-shadow: 0 0 0 3px rgba(96,184,224,0.15) !important;
+}
+body.dark-mode label { color: #8ba3b8; }
+
+/* Topbar */
+body.dark-mode .topbar {
+  background: #0d1018;
+  border-bottom-color: #1e2535;
+  box-shadow: 0 1px 0 #1e2535;
+}
+body.dark-mode .topbar-welcome { color: #4a5a6e; }
+
+/* Nav bar */
+body.dark-mode .announcement-bar {
+  background: #0a1220;
+  border-bottom-color: #1e2535;
+}
+body.dark-mode .menu-icon-btn span { background: #8ba3b8; }
+body.dark-mode .header-actions-strip {
+  background: #080a0f;
+  border-bottom-color: #1e2535;
+}
+
+/* Módulos menu */
+body.dark-mode .modules-menu {
+  background: #0f1219;
+  border-color: #1e2535;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+body.dark-mode .tab-btn {
+  background: #0f1219;
+  border-color: #1e2535;
+  color: #8ba3b8;
+}
+body.dark-mode .tab-btn:hover {
+  background: #151b27;
+  color: #f0f4f8;
+}
+body.dark-mode .tab-btn-active {
+  background: #151b27;
+  color: #60b8e0;
+  border-color: #60b8e0;
+}
+
+/* Notificações */
+body.dark-mode .notifications-panel {
+  background: #0f1219;
+  border-color: #1e2535;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+}
+body.dark-mode .notification-item {
+  background: #151b27;
+  border-color: #1e2d42;
+  color: #f0f4f8;
+}
+body.dark-mode .tag-overdue { background: #f8717122; color: #f87171; }
+
+/* Badges */
+body.dark-mode .role-badge-admin {
+  background: #c9a84c22;
+  color: #c9a84c;
+  border-color: #c9a84c44;
+}
+body.dark-mode .role-badge-employee {
+  background: #151b27;
+  color: #8ba3b8;
+  border-color: #1e2535;
+}
+
+/* Cards home */
+body.dark-mode .home-module-card {
+  background: #151b27;
+  border-color: #1e2d42;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+body.dark-mode .home-module-card strong { color: #60b8e0; }
+body.dark-mode .home-module-card span { color: #8ba3b8; }
+body.dark-mode .home-module-card:hover {
+  background: #1a2438;
+  border-color: #60b8e0;
+  box-shadow: 0 6px 20px rgba(96,184,224,0.15);
+}
+body.dark-mode .home-greeting { color: #f0f4f8; }
+
+/* Painéis */
+body.dark-mode .panel {
+  background: #0f1219;
+  border-color: #1e2535;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+body.dark-mode .stepper-panel { background: #0f1219; border-color: #1e2535; }
+body.dark-mode .step-chip { background: #0f1219; border-color: #1e2535; color: #8ba3b8; }
+body.dark-mode .step-chip-active { background: #60b8e0; border-color: #60b8e0; color: #080a0f; }
+body.dark-mode .proposal-box { background: #151b27; border-color: #1e2535; }
+body.dark-mode .furniture-option-row { background: #151b27; border-color: #1e2535; }
+body.dark-mode .checklist { background: #151b27; border-color: #1e2535; }
+body.dark-mode #salaryPaymentPreview { background: #151b27; border-color: #1e2535; }
+
+/* Botões */
+body.dark-mode .btn {
+  background: #151b27;
+  border-color: #1e2d42;
+  color: #f0f4f8;
+}
+body.dark-mode .btn:hover { background: #1a2438; }
+body.dark-mode .btn-primary {
+  background: #60b8e0;
+  color: #080a0f;
+  border-color: #60b8e0;
+  font-weight: 700;
+}
+body.dark-mode .btn-primary:hover { filter: brightness(0.9); }
+body.dark-mode .btn-danger {
+  background: #f8717118;
+  color: #f87171;
+  border-color: #f8717133;
+}
+
+/* Footer */
+body.dark-mode .footer {
+  background: #060810;
+  border-top-color: #1e2535;
+}
+
+/* Balanço */
+body.dark-mode .balance-entry-panel { background: #151b27; border-color: #1e2535; }
+body.dark-mode .balance-summary { background: #151b27; border-color: #1e2535; }
+body.dark-mode .balance-summary-card { background: #0f1219; border-color: #1e2535; }
+body.dark-mode .month-card { background: #0f1219; border-color: #1e2535; }
+body.dark-mode .month-header { background: #151b27; border-bottom-color: #1e2535; }
+body.dark-mode .month-title { color: #60b8e0; }
+
+/* Registros mobile */
+body.dark-mode .mobile-record-card { background: #0f1219; border-color: #1e2535; }
+
+/* Contratos */
+body.dark-mode .contracts-summary-card { background: #151b27; border-color: #1e2535; }
+body.dark-mode .contracts-summary-card .value { color: #f0f4f8; }
+
+/* Anual */
+body.dark-mode .yearly-overview { border-color: #1e2535; }
+body.dark-mode .yearly-overview h4 { background: #151b27; color: #60b8e0; }
+
+/* Tipografia */
+body.dark-mode h1, body.dark-mode h2, body.dark-mode h3,
+body.dark-mode h4, body.dark-mode h5, body.dark-mode h6 { color: #f0f4f8; }
+body.dark-mode .small { color: #4a5a6e; }
+
+/* Tabelas */
+body.dark-mode .balance-table th {
+  background: #151b27;
+  color: #8ba3b8;
+  border-bottom-color: #1e2535;
+}
+body.dark-mode .balance-table td {
+  color: #dce8f0;
+  border-bottom-color: #1e2535;
+}
+
+/* Listas */
+body.dark-mode .list { border-color: #1e2535; }
+body.dark-mode .list li { border-bottom-color: #1e2535; color: #f0f4f8; }
+body.dark-mode .list button { background: #f8717118; color: #f87171; border-color: #f8717133; }
+
+/* Claude badge */
+body.dark-mode .claude-badge { background: #060810; color: #a78bfa; }
+
+@media (max-width: 840px) {
+  .theme-toggle-btn { width: 32px; height: 32px; min-width: 32px; font-size: 14px; }
+}
+
 @media print {
   body { background: #fff; font-size: 12px; }
   body::before {
@@ -2038,104 +2275,33 @@ body.balance-values-blurred #balanceModule .month-profit {
   pointer-events: none;
 }
 /* ── Dark Mode ────────────────────────────────────────────── */
-body.dark-mode {
-  --bg: #0f1117;
-  --panel: #161820;
-  --primary: #c9a84c;
-  --primary-2: #a07c38;
-  --text: #e2e8f0;
-  --muted: #94a3b8;
-  --danger: #ef4444;
-  --border: #2a2d3a;
-  background: #0f1117!important;
-}
-body.dark-mode .topbar {
-  background: #161820;
-  border-bottom-color: #2a2d3a;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-}
-body.dark-mode .footer {
-  background: #0c0e13;
-  border-top-color: #2a2d3a;
-}
-body.dark-mode .auth-gate,
-body.dark-mode .auth-card {
-  background: #161820;
-  border-color: #2a2d3a;
-  color: var(--text);
-}
-body.dark-mode .auth-gate {
-  background: linear-gradient(180deg, #0f1117 0%, #0c0e13 100%);
-}
-body.dark-mode input,
-body.dark-mode select,
-body.dark-mode textarea {
-  background: #1e2235;
-  border-color: #2a2d3a;
-  color: #e2e8f0;
-}
-body.dark-mode input::placeholder,
-body.dark-mode textarea::placeholder {
-  color: #475569;
-}
-body.dark-mode .tab-btn {
-  color: #64748b;
-}
-body.dark-mode .tab-btn-active,
-body.dark-mode .tab-btn:hover {
-  background: #1e2235;
-  color: #c9a84c;
-}
-body.dark-mode .modules-menu {
-  background: #161820;
-  border-color: #2a2d3a;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-}
-body.dark-mode .home-module-card {
-  background: #1e2235;
-  border-color: #2a2d3a;
-  color: #e2e8f0;
-}
-body.dark-mode .home-module-card:hover {
-  background: #252840;
-}
-body.dark-mode .announcement-bar {
-  background: #161820;
-  border-bottom-color: #2a2d3a;
-}
-body.dark-mode .header-actions-strip {
-  background: #0f1117;
-  border-bottom-color: #2a2d3a;
-}
-body.dark-mode .notifications-panel {
-  background: #1e2235;
-  border-color: #2a2d3a;
-}
-body.dark-mode .btn {
-  background: #1e2235;
-  border-color: #2a2d3a;
-  color: #e2e8f0;
-}
-body.dark-mode .btn:hover { filter: brightness(1.1); }
-body.dark-mode .btn-primary {
-  background: #c9a84c;
-  color: #0f1117;
-  border-color: #c9a84c;
-}
-body.dark-mode .btn-danger {
-  background: #ef444418;
-  color: #ef4444;
-  border-color: #ef444433;
-}
-body.dark-mode label { color: #94a3b8; }
-body.dark-mode h1, body.dark-mode h2, body.dark-mode h3,
-body.dark-mode h4, body.dark-mode h5 { color: #e2e8f0; }
-body.dark-mode table thead tr { background: #1e2235; }
-body.dark-mode table tbody tr:nth-child(even) { background: #161820; }
-body.dark-mode table tbody tr:hover { background: #1e2235; }
-body.dark-mode td, body.dark-mode th { border-color: #2a2d3a; color: #cbd5e1; }
-body.dark-mode .role-badge-admin { background: #c9a84c22; color: #c9a84c; border-color: #c9a84c44; }
-body.dark-mode .role-badge-employee { background: #1e2235; color: #94a3b8; border-color: #2a2d3a; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* Botão de tema */
 .theme-toggle-btn {
