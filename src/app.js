@@ -7746,11 +7746,9 @@ function renderHomeDashboard() {
   const name = authState.user ? getUserDisplayNameFromEmail() : "usuário";
   greeting.textContent = `Olá ${name}, o que você precisa fazer agora?`;
 
-  // Remove grid class do container para não conflitar com o layout do dashboard
   container.className = "";
   container.style.cssText = "width:100%;display:block;";
 
-  // ── Dados ──────────────────────────────────────────────────────────────────
   const contracts = (state.contractsPortfolio || []);
   const activeContracts = contracts.filter(c => c.isEffective);
   const pendingContracts = contracts.filter(c => !c.isEffective);
@@ -7771,7 +7769,8 @@ function renderHomeDashboard() {
     return sum + (cap * rate * 30 * (1 - tax));
   }, 0);
 
-  const entries = (state.balance?.entries || []);
+  // Receita últimos 6 meses — usa dateTime e type=income
+  const entries = (state.balance && state.balance.entries) ? state.balance.entries : [];
   const monthLabels = [], monthValues = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
@@ -7780,10 +7779,11 @@ function renderHomeDashboard() {
     monthLabels.push(label.charAt(0).toUpperCase() + label.slice(1));
     const total = entries
       .filter(e => {
-        const ed = new Date(e.date || e.createdAt || "");
-        return ed.getFullYear() === y && (ed.getMonth() + 1) === m && (parseFloat(e.amount) || 0) > 0;
+        if (e.type !== "income") return false;
+        const ed = new Date(e.dateTime || "");
+        return !isNaN(ed) && ed.getFullYear() === y && (ed.getMonth() + 1) === m;
       })
-      .reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+      .reduce((s, e) => s + (Number(e.amount) || 0), 0);
     monthValues.push(total);
   }
   const maxVal = Math.max(...monthValues, 1);
@@ -10368,6 +10368,22 @@ function bindEvents() {
 }
 
 async function initializeApp() {
+  // ── Tema dark/light ──────────────────────────────
+  const THEME_KEY = "vm-theme";
+  function applyTheme(dark) {
+    document.body.classList.toggle("dark-mode", dark);
+    const btn = document.getElementById("btnThemeToggle");
+    if (btn) btn.textContent = dark ? "☀️" : "🌙";
+  }
+  applyTheme(localStorage.getItem(THEME_KEY) === "dark");
+  document.addEventListener("click", (e) => {
+    if (e.target && e.target.id === "btnThemeToggle") {
+      const isDark = document.body.classList.contains("dark-mode");
+      applyTheme(!isDark);
+      localStorage.setItem(THEME_KEY, !isDark ? "dark" : "light");
+    }
+  });
+  // ────────────────────────────────────────────────
   loadState();
   normalizeStatePatterns();
   bindEvents();
