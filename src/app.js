@@ -277,6 +277,11 @@ const EXPENSE_CATEGORY_LABELS = {
   internet: "Internet",
   outros: "Outros",
 };
+const EXPENSE_SUMMARY_CATEGORY_LABELS = {
+  ...EXPENSE_CATEGORY_LABELS,
+  salario: "Salários",
+  manutencao: "Manutenções",
+};
 const APP_TABS = [
   "home",
   "proposals",
@@ -4276,6 +4281,39 @@ function isTollExpense(entry) {
   return tollKeywords.some((keyword) => text.includes(keyword));
 }
 
+function getExpenseSummaryCategory(entry) {
+  if (!entry || entry.type !== "expense") return "";
+  if (isFuelExpense(entry)) return "combustivel";
+  if (isTollExpense(entry)) return "pedagios";
+  return resolveExpenseCategory(entry) || "outros";
+}
+
+function buildExpenseCategoryTotals(entries) {
+  return (entries || [])
+    .filter((entry) => entry.type === "expense")
+    .reduce((acc, entry) => {
+      const category = getExpenseSummaryCategory(entry);
+      if (!category) return acc;
+      acc[category] = (acc[category] || 0) + Number(entry.amount || 0);
+      return acc;
+    }, {});
+}
+
+function buildExpenseCategorySummaryCards(categoryTotals, options = {}) {
+  const exclude = new Set(options.exclude || []);
+  return Object.entries(EXPENSE_SUMMARY_CATEGORY_LABELS)
+    .filter(([category]) => !exclude.has(category))
+    .map(([category, label]) => ({ category, label, amount: Number(categoryTotals?.[category] || 0) }))
+    .filter((item) => item.amount > 0)
+    .map((item) => `
+      <div class="balance-summary-card balance-summary-category-card">
+        <div class="label">${escapeHtml(item.label)}</div>
+        <div class="value balance-expense">${currencyBRL.format(item.amount)}</div>
+      </div>
+    `)
+    .join("");
+}
+
 function getMonthDateRange(year, monthNumber) {
   const month = Math.max(1, Math.min(12, Number(monthNumber || 1)));
   const y = Number(year || new Date().getFullYear());
@@ -5097,6 +5135,7 @@ function renderBalance() {
   const totalExpense = scopedEntries
     .filter((entry) => entry.type === "expense")
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  const expenseCategoryTotals = buildExpenseCategoryTotals(scopedEntries);
   const totalFuelExpense = scopedEntries
     .filter((entry) => isFuelExpense(entry))
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
@@ -5107,6 +5146,9 @@ function renderBalance() {
     .filter((entry) => resolveExpenseCategory(entry) === "impostos")
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
   const totalProfit = totalIncome - totalExpense;
+  const extraExpenseCategoryCards = buildExpenseCategorySummaryCards(expenseCategoryTotals, {
+    exclude: ["combustivel", "pedagios", "impostos"],
+  });
 
   const summaryTitle =
     uiState.balanceMode === "monthly"
@@ -5256,6 +5298,7 @@ function renderBalance() {
       <div class="balance-summary-card"><div class="label">Combustível</div><div class="value balance-expense">${currencyBRL.format(totalFuelExpense)}</div></div>
       <div class="balance-summary-card"><div class="label">Pedágios</div><div class="value balance-expense">${currencyBRL.format(totalTollExpense)}</div></div>
       <div class="balance-summary-card"><div class="label">Impostos</div><div class="value balance-expense">${currencyBRL.format(totalTaxExpense)}</div></div>
+      ${extraExpenseCategoryCards}
       <div class="balance-summary-card"><div class="label">Lucro</div><div class="value">${currencyBRL.format(totalProfit)}</div></div>
     </div>
   `;
@@ -7697,30 +7740,30 @@ function renderAll() {
 
 function renderHomeDashboard() {
   const greeting = document.getElementById("homeGreeting");
-  const grid = document.getElementById("homeModulesGrid");
-  if (!greeting || !grid) return;
+  const container = document.getElementById("homeModulesGrid");
+  if (!greeting || !container) return;
 
   const name = authState.user ? getUserDisplayNameFromEmail() : "usuário";
   greeting.textContent = `Olá ${name}, o que você precisa fazer agora?`;
 
-  // ── Métricas ─────────────────────────────────────────────────────────────
+  // Remove grid class do container para não conflitar com o layout do dashboard
+  container.className = "";
+  container.style.cssText = "width:100%;display:block;";
+
+  // ── Dados ──────────────────────────────────────────────────────────────────
   const contracts = (state.contractsPortfolio || []);
   const activeContracts = contracts.filter(c => c.isEffective);
   const pendingContracts = contracts.filter(c => !c.isEffective);
-
   const rentedProperties = (state.rentedProperties || []);
-  const today = new Date();
-  today.setHours(0,0,0,0);
-  const next7 = new Date(today); next7.setDate(today.getDate() + 7);
 
-  // Vencimentos próximos (imóveis com nextDueDateISO nos próximos 7 dias)
+  const today = new Date(); today.setHours(0,0,0,0);
+  const next7 = new Date(today); next7.setDate(today.getDate() + 7);
   const upcomingDue = rentedProperties.filter(p => {
     if (!p.nextDueDateISO) return false;
     const d = new Date(p.nextDueDateISO + "T00:00:00");
     return d >= today && d <= next7;
   });
 
-  // Receita mensal estimada (soma dos contratos ativos: capacity * dailyRatePerPerson * 30 * (1 - tax))
   const monthlyRevenue = activeContracts.reduce((sum, c) => {
     const cap = parseFloat(c.capacity) || 0;
     const rate = parseFloat(c.dailyRatePerPerson) || 0;
@@ -7728,28 +7771,23 @@ function renderHomeDashboard() {
     return sum + (cap * rate * 30 * (1 - tax));
   }, 0);
 
-  // Receita por mês (últimos 6 meses das entradas do balanço)
   const entries = (state.balance?.entries || []);
-  const monthLabels = [];
-  const monthValues = [];
+  const monthLabels = [], monthValues = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    const y = d.getFullYear();
-    const m = d.getMonth() + 1;
+    const y = d.getFullYear(), m = d.getMonth() + 1;
     const label = d.toLocaleString("pt-BR", { month: "short" });
     monthLabels.push(label.charAt(0).toUpperCase() + label.slice(1));
     const total = entries
-      .filter(e => e.type === "income" || e.category === "receita" || e.amount > 0)
       .filter(e => {
         const ed = new Date(e.date || e.createdAt || "");
-        return ed.getFullYear() === y && (ed.getMonth() + 1) === m;
+        return ed.getFullYear() === y && (ed.getMonth() + 1) === m && (parseFloat(e.amount) || 0) > 0;
       })
       .reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
     monthValues.push(total);
   }
   const maxVal = Math.max(...monthValues, 1);
 
-  // ── Módulos ───────────────────────────────────────────────────────────────
   const items = [
     { tab: "proposals",        title: "Propostas Comerciais", description: "Criar, editar e exportar propostas." },
     { tab: "clients",          title: "Clientes",             description: "Consultar e gerenciar clientes." },
@@ -7763,8 +7801,7 @@ function renderHomeDashboard() {
     { tab: "exports",          title: "Exportados",           description: "Acessar documentos exportados." },
   ].filter(item => canAccessTab(item.tab));
 
-  // ── Render ────────────────────────────────────────────────────────────────
-  grid.innerHTML = `
+  container.innerHTML = `
     <div class="dash-metrics">
       <div class="dash-metric-card">
         <div class="dash-metric-label">Contratos ativos</div>
@@ -7801,19 +7838,16 @@ function renderHomeDashboard() {
                 const clientName = (state.clients || []).find(cl => cl.id === c.clientId)?.name || c.contractName || "Sem nome";
                 const status = c.isEffective ? "active" : "pending";
                 const statusLabel = c.isEffective ? "Ativo" : "Pendente";
-                const revenue = (() => {
-                  const cap = parseFloat(c.capacity) || 0;
-                  const rate = parseFloat(c.dailyRatePerPerson) || 0;
-                  const tax = (parseFloat(c.monthlyTaxPercent) || 0) / 100;
-                  const val = cap * rate * 30 * (1 - tax);
-                  return val > 0 ? currencyBRL.format(val) : "—";
-                })();
-                return `
-                  <div class="dash-contract-row">
-                    <div class="dash-contract-name">${clientName}</div>
-                    <div class="dash-contract-status dash-status--${status}">${statusLabel}</div>
-                    <div class="dash-contract-value">${revenue}</div>
-                  </div>`;
+                const cap = parseFloat(c.capacity) || 0;
+                const rate = parseFloat(c.dailyRatePerPerson) || 0;
+                const tax = (parseFloat(c.monthlyTaxPercent) || 0) / 100;
+                const val = cap * rate * 30 * (1 - tax);
+                const revenue = val > 0 ? currencyBRL.format(val) : "—";
+                return `<div class="dash-contract-row">
+                  <div class="dash-contract-name">${clientName}</div>
+                  <div class="dash-contract-status dash-status--${status}">${statusLabel}</div>
+                  <div class="dash-contract-value">${revenue}</div>
+                </div>`;
               }).join("")
           }
         </div>
@@ -7827,14 +7861,11 @@ function renderHomeDashboard() {
           ${monthLabels.map((label, i) => {
             const pct = Math.round((monthValues[i] / maxVal) * 100);
             const hasData = monthValues[i] > 0;
-            return `
-              <div class="dash-bar-row">
-                <div class="dash-bar-label">${label}</div>
-                <div class="dash-bar-track">
-                  <div class="dash-bar-fill ${hasData ? "" : "dash-bar-empty"}" style="width:${hasData ? Math.max(pct, 2) : 0}%"></div>
-                </div>
-                <div class="dash-bar-val">${hasData ? currencyBRL.format(monthValues[i]).replace("R$","").trim() : "—"}</div>
-              </div>`;
+            return `<div class="dash-bar-row">
+              <div class="dash-bar-label">${label}</div>
+              <div class="dash-bar-track"><div class="dash-bar-fill${hasData ? "" : " dash-bar-empty"}" style="width:${hasData ? Math.max(pct,2) : 0}%"></div></div>
+              <div class="dash-bar-val">${hasData ? currencyBRL.format(monthValues[i]).replace("R$","").trim() : "—"}</div>
+            </div>`;
           }).join("")}
         </div>
       </div>
@@ -10337,23 +10368,6 @@ function bindEvents() {
 }
 
 async function initializeApp() {
-  // ── Tema (dark/light mode) ──────────────────────────────
-  const THEME_KEY = "vm-theme";
-  function applyTheme(dark) {
-    document.body.classList.toggle("dark-mode", dark);
-    const btn = document.getElementById("btnThemeToggle");
-    if (btn) btn.textContent = dark ? "☀️" : "🌙";
-  }
-  const savedTheme = localStorage.getItem(THEME_KEY);
-  applyTheme(savedTheme === "dark");
-  document.addEventListener("click", (e) => {
-    if (e.target && e.target.id === "btnThemeToggle") {
-      const isDark = document.body.classList.contains("dark-mode");
-      applyTheme(!isDark);
-      localStorage.setItem(THEME_KEY, !isDark ? "dark" : "light");
-    }
-  });
-  // ───────────────────────────────────────────────────────
   loadState();
   normalizeStatePatterns();
   bindEvents();
